@@ -5,6 +5,8 @@ use ic_scalable_misc::enums::api_error_type::ApiError;
 
 use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
 
+use crate::store::DATA;
+
 use super::store::Store;
 
 // Method to join an existing event
@@ -154,4 +156,40 @@ fn add_owner_as_attendee(
     group_identifier: Principal,
 ) -> Result<(), bool> {
     Store::add_owner_as_attendee(user_principal, event_identifier, group_identifier)
+}
+
+// COMPOSITE_QUERY PREPARATION
+// This methods is used by the parent canister to get members the (this) child canister
+// Data serialized and send as byte array chunks ` (bytes, (start_chunk, end_chunk)) `
+// The parent canister can then deserialize the data and pass it to the frontend
+#[query]
+#[candid_method(query)]
+fn get_chunked_join_data(
+    event_identifier: Principal,
+    chunk: usize,
+    max_bytes_per_chunk: usize,
+) -> (Vec<u8>, (usize, usize)) {
+    if caller() != DATA.with(|data| data.borrow().parent) {
+        return (vec![], (0, 0));
+    }
+
+    Store::get_chunked_join_data(&event_identifier, chunk, max_bytes_per_chunk)
+}
+
+// COMPOSITE_QUERY PREPARATION
+// This methods is used by the parent canister to get members the (this) child canister
+// Data serialized and send as byte array chunks ` (bytes, (start_chunk, end_chunk)) `
+// The parent canister can then deserialize the data and pass it to the frontend
+#[query]
+#[candid_method(query)]
+fn get_chunked_invite_data(
+    event_identifier: Principal,
+    chunk: usize,
+    max_bytes_per_chunk: usize,
+) -> (Vec<u8>, (usize, usize)) {
+    if caller() != DATA.with(|data| data.borrow().parent) {
+        return (vec![], (0, 0));
+    }
+
+    Store::get_chunked_invite_data(&event_identifier, chunk, max_bytes_per_chunk)
 }

@@ -14,6 +14,7 @@ use ic_scalable_misc::{
     helpers::{
         error_helper::api_error,
         role_helper::{default_roles, get_group_roles, get_member_roles, has_permission},
+        serialize_helper::serialize,
     },
     models::{
         identifier_model::Identifier,
@@ -868,6 +869,128 @@ impl Store {
                 "check_permission",
                 None,
             )),
+        }
+    }
+
+    // Used for composite_query calls from the parent canister
+    //
+    // Method to get filtered attendees serialized and chunked
+    pub fn get_chunked_join_data(
+        event_identifier: &Principal,
+        chunk: usize,
+        max_bytes_per_chunk: usize,
+    ) -> (Vec<u8>, (usize, usize)) {
+        let attendees = DATA.with(|data| Data::get_entries(data));
+        // Get attendees for filtering
+        let mapped_attendees: Vec<JoinedAttendeeResponse> = attendees
+            .iter()
+            // Filter attendees that have joined the group
+            .filter(|(_identifier, _attendee_data)| {
+                _attendee_data
+                    .joined
+                    .iter()
+                    .any(|j| &j.event_identifier == event_identifier)
+            })
+            // Map attendee to joined attendee response
+            .map(|(_identifier, _attendee_data)| {
+                Self::map_attendee_to_joined_attendee_response(
+                    _identifier,
+                    _attendee_data,
+                    event_identifier.clone(),
+                )
+            })
+            .collect();
+
+        if let Ok(bytes) = serialize(&mapped_attendees) {
+            // Check if the bytes of the serialized groups are greater than the max bytes per chunk specified as an argument
+            if bytes.len() >= max_bytes_per_chunk {
+                // Get the start and end index of the bytes to be returned
+                let start = chunk * max_bytes_per_chunk;
+                let end = (chunk + 1) * (max_bytes_per_chunk);
+
+                // Get the bytes to be returned, if the end index is greater than the length of the bytes, return the remaining bytes
+                let response = if end >= bytes.len() {
+                    bytes[start..].to_vec()
+                } else {
+                    bytes[start..end].to_vec()
+                };
+
+                // Determine the max number of chunks that can be returned, a float is used because the number of chunks can be a decimal in this step
+                let mut max_chunks: f64 = 0.00;
+                if max_bytes_per_chunk < bytes.len() {
+                    max_chunks = (bytes.len() / max_bytes_per_chunk) as f64;
+                }
+
+                // return the response and start and end chunk index, the end chunk index is calculated by rounding up the max chunks
+                return (response, (chunk, max_chunks.ceil() as usize));
+            }
+
+            // if the bytes of the serialized groups are less than the max bytes per chunk specified as an argument, return the bytes and start and end chunk index as 0
+            return (bytes, (0, 0));
+        } else {
+            // if the groups cant be serialized return an empty vec and start and end chunk index as 0
+            return (vec![], (0, 0));
+        }
+    }
+
+    // Used for composite_query calls from the parent canister
+    //
+    // Method to get filtered attendees serialized and chunked
+    pub fn get_chunked_invite_data(
+        event_identifier: &Principal,
+        chunk: usize,
+        max_bytes_per_chunk: usize,
+    ) -> (Vec<u8>, (usize, usize)) {
+        let attendees = DATA.with(|data| Data::get_entries(data));
+        // Get attendees for filtering
+        let mapped_attendees: Vec<InviteAttendeeResponse> = attendees
+            .iter()
+            // Filter attendees that have joined the group
+            .filter(|(_identifier, _attendee_data)| {
+                _attendee_data
+                    .invites
+                    .iter()
+                    .any(|j| &j.event_identifier == event_identifier)
+            })
+            // Map member to joined member response
+            .map(|(_identifier, _event_data)| {
+                Self::map_attendee_to_invite_attendee_response(
+                    _identifier,
+                    _event_data,
+                    event_identifier.clone(),
+                )
+            })
+            .collect();
+
+        if let Ok(bytes) = serialize(&mapped_attendees) {
+            // Check if the bytes of the serialized groups are greater than the max bytes per chunk specified as an argument
+            if bytes.len() >= max_bytes_per_chunk {
+                // Get the start and end index of the bytes to be returned
+                let start = chunk * max_bytes_per_chunk;
+                let end = (chunk + 1) * (max_bytes_per_chunk);
+
+                // Get the bytes to be returned, if the end index is greater than the length of the bytes, return the remaining bytes
+                let response = if end >= bytes.len() {
+                    bytes[start..].to_vec()
+                } else {
+                    bytes[start..end].to_vec()
+                };
+
+                // Determine the max number of chunks that can be returned, a float is used because the number of chunks can be a decimal in this step
+                let mut max_chunks: f64 = 0.00;
+                if max_bytes_per_chunk < bytes.len() {
+                    max_chunks = (bytes.len() / max_bytes_per_chunk) as f64;
+                }
+
+                // return the response and start and end chunk index, the end chunk index is calculated by rounding up the max chunks
+                return (response, (chunk, max_chunks.ceil() as usize));
+            }
+
+            // if the bytes of the serialized groups are less than the max bytes per chunk specified as an argument, return the bytes and start and end chunk index as 0
+            return (bytes, (0, 0));
+        } else {
+            // if the groups cant be serialized return an empty vec and start and end chunk index as 0
+            return (vec![], (0, 0));
         }
     }
 }
