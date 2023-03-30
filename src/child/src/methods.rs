@@ -7,6 +7,8 @@ use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeRes
 
 use super::store::Store;
 
+// Method to join an existing event
+// The method is async because it optionally creates a new canister is created
 #[update]
 #[candid_method(update)]
 async fn join_event(
@@ -16,6 +18,7 @@ async fn join_event(
     Store::join_event(caller(), event_identifier, group_identifier).await
 }
 
+// Method to invite a member to an event
 #[update]
 #[candid_method(update)]
 async fn invite_to_event(
@@ -30,6 +33,7 @@ async fn invite_to_event(
     }
 }
 
+// Method to accept an invite to an event as a admin
 #[update]
 #[candid_method(update)]
 async fn accept_user_request_event_invite(
@@ -44,6 +48,7 @@ async fn accept_user_request_event_invite(
     }
 }
 
+// Method to accept an invite to an event as a user
 #[update]
 #[candid_method(update)]
 async fn accept_owner_request_event_invite(
@@ -52,18 +57,21 @@ async fn accept_owner_request_event_invite(
     Store::accept_owner_request_event_invite(caller(), event_identifier)
 }
 
+// Method to get the number of attendees for an event
 #[query]
 #[candid_method(query)]
 fn get_event_attendees_count(event_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
     Store::get_event_attendees_count(event_identifiers)
 }
 
+// Method to get the number of invites for an event
 #[query]
 #[candid_method(query)]
 fn get_event_invites_count(event_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
     Store::get_group_invites_count(event_identifiers)
 }
 
+// Method to get the attendees for an event
 #[query]
 #[candid_method(query)]
 fn get_event_attendees(
@@ -72,24 +80,28 @@ fn get_event_attendees(
     Ok(Store::get_event_attendees(event_identifier))
 }
 
+// Method to get the caller his joined events and invites
 #[query]
 #[candid_method(query)]
 fn get_self() -> Result<(Principal, Attendee), ApiError> {
     Store::get_self(caller())
 }
 
+// Method to leave an event as a user
 #[update]
 #[candid_method(update)]
 fn leave_event(event_identifier: Principal) -> Result<(), ApiError> {
-    Store::leave_event(caller(), event_identifier)
+    Store::remove_join_from_attendee(caller(), event_identifier)
 }
 
+// Method to remove an event invite as a user
 #[update]
 #[candid_method(update)]
 fn remove_invite(event_identifier: Principal) -> Result<(), ApiError> {
-    Store::remove_invite(caller(), event_identifier)
+    Store::remove_invite_from_event(caller(), event_identifier)
 }
 
+// Method to remove an event attendee as a admin
 #[update]
 #[candid_method(update)]
 async fn remove_attendee_from_event(
@@ -104,6 +116,7 @@ async fn remove_attendee_from_event(
     }
 }
 
+// Method to remove an event invite as a admin
 #[update]
 #[candid_method(update)]
 async fn remove_attendee_invite_from_event(
@@ -118,6 +131,7 @@ async fn remove_attendee_invite_from_event(
     }
 }
 
+// Method to get event invites for a specific event inside a group
 #[update]
 #[candid_method(update)]
 async fn get_event_invites(
@@ -131,6 +145,7 @@ async fn get_event_invites(
     }
 }
 
+// Method to add the owner as an attendee
 #[update]
 #[candid_method(update)]
 fn add_owner_as_attendee(

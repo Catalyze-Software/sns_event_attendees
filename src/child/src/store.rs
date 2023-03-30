@@ -32,6 +32,8 @@ thread_local! {
 pub struct Store;
 
 impl Store {
+    // TODO: See if i can refactor this code - rem.codes
+    // Method to join an existing event
     pub async fn join_event(
         caller: Principal,
         event_identifier: Principal,
@@ -45,23 +47,14 @@ impl Store {
         match event_owner_and_privacy {
             // if the call fails return an error
             Err(err) => Err(err),
+            // if the call succeeds, continue
             Ok((_, _event_privacy)) => {
-                let existing_attendee = Self::_get_attendee_from_caller(caller);
-
-                match existing_attendee.clone() {
-                    // If there is no exisiting attendee
+                // get the attendee for the caller
+                match Self::_get_attendee_from_caller(caller) {
+                    // if the attendee is not found, do nothing
                     None => {}
-                    Some((_identifier, _exisiting_attendee)) => {
-                        if _exisiting_attendee.principal != caller {
-                            return Err(api_error(
-                                ApiErrorType::BadRequest,
-                                "UNAUTHORIZED",
-                                "You are not authorized to perform this action",
-                                DATA.with(|data| Data::get_name(data)).as_str(),
-                                "join_event",
-                                None,
-                            ));
-                        }
+                    // if the attendee is found, continue
+                    Some((_identifier, mut _exisiting_attendee)) => {
                         // if the event identifier is already found in the joined array, throw an error
                         if _exisiting_attendee
                             .joined
@@ -95,20 +88,23 @@ impl Store {
                     }
                 };
 
+                // add the event invite or join to the attendee
                 let updated_attendee = Self::add_invite_or_join_event_to_attendee(
                     caller,
                     event_identifier.clone(),
                     group_identifier,
-                    existing_attendee.clone(),
+                    Self::_get_attendee_from_caller(caller),
                     _event_privacy,
                 );
 
                 match updated_attendee {
+                    // If something went wrong, return the error
                     Err(err) => Err(err),
-                    Ok(_updated_attendee) => match existing_attendee {
+                    // If the attendee was updated or added, continue
+                    Ok(_updated_attendee) => match Self::_get_attendee_from_caller(caller) {
                         None => {
                             let result = DATA.with(|data| {
-                                Data::add_entry(data, _updated_attendee, Some("mbr".to_string()))
+                                Data::add_entry(data, _updated_attendee, Some("eae".to_string()))
                             });
                             Self::update_attendee_count_on_event(&event_identifier);
                             result
@@ -122,96 +118,73 @@ impl Store {
                         }
                     },
                 }
-                // add scaling logic
+                // TODO: add scaling logic
                 // Determine if an entry needs to be updated or added as a new one
             }
         }
     }
 
-    pub fn leave_event(caller: Principal, event_identifier: Principal) -> Result<(), ApiError> {
-        let existing_attendee = Self::_get_attendee_from_caller(caller);
-
-        match existing_attendee {
-            None => Err(Self::_attendee_not_found_error("leave_event", None)),
-            Some((_identifier, mut _attendee)) => {
-                let joined: Vec<Join> = _attendee
-                    .joined
-                    .into_iter()
-                    .filter(|j| &j.event_identifier != &event_identifier)
-                    .collect();
-
-                _attendee.joined = joined;
-                let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
-                Ok(Self::update_attendee_count_on_event(&event_identifier))
-            }
-        }
-    }
-
-    pub fn remove_invite(caller: Principal, event_identifier: Principal) -> Result<(), ApiError> {
-        let existing_attendee = Self::_get_attendee_from_caller(caller);
-        match existing_attendee {
-            None => Err(Self::_attendee_not_found_error("remove_invite", None)),
-            Some((_identifier, mut _attendee)) => {
-                let invites: Vec<Invite> = _attendee
-                    .invites
-                    .into_iter()
-                    .filter(|j| &j.event_identifier != &event_identifier)
-                    .collect();
-
-                _attendee.invites = invites;
-                let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
-                Ok(())
-            }
-        }
-    }
-
+    // Method to remove a event attendee entry from an attendee
     pub fn remove_join_from_attendee(
         attendee_principal: Principal,
         event_identifier: Principal,
     ) -> Result<(), ApiError> {
         match Self::_get_attendee_from_caller(attendee_principal) {
+            // if the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error(
                 "remove_join_from_attendee",
                 None,
             )),
+            // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
+                // filter out the event from the joined array
                 let joined: Vec<Join> = _attendee
                     .joined
                     .into_iter()
                     .filter(|j| &j.event_identifier != &event_identifier)
                     .collect();
 
+                // set the joined array to the filtered array on the attendee
                 _attendee.joined = joined;
+                // update the attendee
                 let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+
+                // update the attendee count on the event canister (fire-and-forget)
                 return Ok(Self::update_attendee_count_on_event(&event_identifier));
             }
         }
     }
 
+    // Method to remove an invite from an attendee
     pub fn remove_invite_from_event(
         attendee_principal: Principal,
         event_identifier: Principal,
     ) -> Result<(), ApiError> {
-        let existing = Self::_get_attendee_from_caller(attendee_principal);
-        match existing {
+        match Self::_get_attendee_from_caller(attendee_principal) {
+            // if the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error(
                 "remove_invite_from_attendee",
                 None,
             )),
+            // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
+                // filter out the event from the invites array
                 let invites: Vec<Invite> = _attendee
                     .invites
                     .into_iter()
                     .filter(|j| &j.event_identifier != &event_identifier)
                     .collect();
 
+                // set the invites array to the filtered array on the attendee
                 _attendee.invites = invites;
+                // update the attendee
                 let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
                 Ok(())
             }
         }
     }
 
+    // Method to add an invite or join to an attendee
     fn add_invite_or_join_event_to_attendee(
         caller: Principal,
         event_identifier: Principal,
@@ -219,6 +192,7 @@ impl Store {
         attendee: Option<(Principal, Attendee)>,
         event_privacy: Privacy,
     ) -> Result<Attendee, ApiError> {
+        // Create the initial join entry
         let join = Join {
             event_identifier,
             group_identifier,
@@ -226,6 +200,7 @@ impl Store {
             created_at: time(),
         };
 
+        // Create the initial invite entry
         let invite = Invite {
             event_identifier,
             group_identifier,
@@ -236,46 +211,40 @@ impl Store {
 
         use Privacy::*;
         match event_privacy {
-            // Create a joined entry based on the group privacy settings
+            // if the event is public, add the join to the attendee
             Public => match attendee {
+                // If the attendee is not found, create a new one and add the join to the joined array
                 None => Ok(Attendee {
                     principal: caller,
                     joined: vec![join],
                     invites: vec![],
                 }),
+                // If the attendee is found, push the join to the existing joined array
                 Some((_, mut _attendee)) => {
                     _attendee.joined.push(join);
                     Ok(_attendee)
                 }
             },
-            // Create a invite entry based on the group privacy settings
+            // if the event is private, add the invite to the attendee
             Private => match attendee {
+                // If the attendee is not found, create a new one and add the invite to the invites array
                 None => Ok(Attendee {
                     principal: caller,
                     joined: vec![],
                     invites: vec![invite],
                 }),
+                // If the attendee is found, push the invite to the existing invites array
                 Some((_, mut _attendee)) => {
                     _attendee.invites.push(invite);
                     Ok(_attendee)
                 }
             },
             // This method needs a different call to split the logic
-            InviteOnly => {
+            _ => {
                 return Err(api_error(
                     ApiErrorType::BadRequest,
                     "UNSUPPORTED",
-                    "This type of invite isnt supported through this call",
-                    DATA.with(|data| Data::get_name(data)).as_str(),
-                    "add_invite_or_join_event_to_attendee",
-                    None,
-                ))
-            }
-            Gated(_) => {
-                return Err(api_error(
-                    ApiErrorType::BadRequest,
-                    "UNSUPPORTED",
-                    "This type of invite isnt supported through this call",
+                    "This type isnt supported through this call",
                     DATA.with(|data| Data::get_name(data)).as_str(),
                     "add_invite_or_join_event_to_attendee",
                     None,
@@ -284,49 +253,17 @@ impl Store {
         }
     }
 
+    // Method to get an attendee entry from the caller
     pub fn get_self(caller: Principal) -> Result<(Principal, Attendee), ApiError> {
-        let existing = Self::_get_attendee_from_caller(caller);
-        match existing {
+        match Self::_get_attendee_from_caller(caller) {
+            // if the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error("get_self", None)),
+            // if the attendee is found, return the attendee
             Some(_attendee) => Ok(_attendee),
         }
     }
 
-    // pub fn get_event_attendee_by_principal(
-    //     caller: Principal,
-    //     event_identifier: Principal,
-    // ) -> Result<JoinedAttendeeResponse, ApiError> {
-    //     DATA.with(|data| {
-    //         let existing_attendee = Store::_get_attendee_from_caller(caller);
-    //         match existing_attendee {
-    //             None => Err(Self::_attendee_not_found_error("get_self", None)),
-    //             Some((_identifier, _attendee)) => {
-    //                 let join = _attendee
-    //                     .joined
-    //                     .iter()
-    //                     .find(|j| &j.event_identifier == &event_identifier);
-
-    //                 match join {
-    //                     None => Err(api_error(
-    //                         ApiErrorType::NotFound,
-    //                         "NOT_JOINED",
-    //                         "Not an attendee",
-    //                         Data::get_name(data).as_str(),
-    //                         "get_event_attendee_by_principal",
-    //                         None,
-    //                     )),
-    //                     Some(_join) => Ok(JoinedAttendeeResponse {
-    //                         event_identifier: _join.event_identifier,
-    //                         group_identifier: _join.group_identifier,
-    //                         attendee_identifier: _identifier,
-    //                         principal: caller,
-    //                     }),
-    //                 }
-    //             }
-    //         }
-    //     })
-    // }
-
+    // Method to get the event attendees from a single event
     pub fn get_event_attendees(event_identifier: Principal) -> Vec<JoinedAttendeeResponse> {
         DATA.with(|data| {
             let attendees = Data::get_entries(data);
@@ -350,15 +287,20 @@ impl Store {
         })
     }
 
+    // Method to get the event attendees count from multiple events
     pub fn get_event_attendees_count(event_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
+        // Create the initial attendees count array
         let mut attendees_count: Vec<(Principal, usize)> = vec![];
 
         DATA.with(|data| {
+            // Get the attendees from the data canister
             let attendees = Data::get_entries(data);
 
+            // Loop through the event identifiers
             for event_identifier in event_identifiers {
                 let count = attendees
                     .iter()
+                    // Filter the attendees to only those that have joined the event
                     .filter(|(_identifier, _attendee)| {
                         _attendee
                             .joined
@@ -366,6 +308,7 @@ impl Store {
                             .any(|j| &j.event_identifier == &event_identifier)
                     })
                     .count();
+                // Push the event identifier and the count to the attendees count array
                 attendees_count.push((event_identifier, count));
             }
         });
@@ -373,15 +316,21 @@ impl Store {
         attendees_count
     }
 
+    // Method to get the group invites from a single group
     pub fn get_group_invites_count(group_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
+        // Create the initial invite count array
         let mut attendees_count: Vec<(Principal, usize)> = vec![];
 
         DATA.with(|data| {
+            // Get the attendees from the data canister
             let attendees = Data::get_entries(data);
 
+            // Loop through the group identifiers
             for group_identifier in group_identifiers {
+                // Get the count of attendees that have been invited to the group
                 let count = attendees
                     .iter()
+                    // Filter the attendees to only those that have been invited to the group
                     .filter(|(_identifier, attendee)| {
                         attendee
                             .invites
@@ -389,6 +338,7 @@ impl Store {
                             .any(|j| &j.event_identifier == &group_identifier)
                     })
                     .count();
+                // Push the group identifier and the count to the invite count array
                 attendees_count.push((group_identifier, count));
             }
         });
@@ -396,18 +346,20 @@ impl Store {
         attendees_count
     }
 
+    // Method to get the event invites from a single event
     pub fn get_event_invites(event_identifier: Principal) -> Vec<InviteAttendeeResponse> {
         DATA.with(|data| {
-            let attendees = Data::get_entries(data);
-
-            attendees
+            // Get the attendees from the data canister
+            Data::get_entries(data)
                 .iter()
+                // Filter the attendees to only those that have been invited to the event
                 .filter(|(_identifier, _attendee)| {
                     _attendee
                         .invites
                         .iter()
                         .any(|j| &j.event_identifier == &event_identifier)
                 })
+                // Map the attendee to an invite attendee response
                 .map(|(_identifier, _attendee)| {
                     Self::map_attendee_to_invite_attendee_response(
                         _identifier,
@@ -419,13 +371,13 @@ impl Store {
         })
     }
 
+    // Method to invite
     pub fn invite_to_event(
         event_identifier: Principal,
         attendee_principal: Principal,
         group_identifier: Principal,
     ) -> Result<(Principal, Attendee), ApiError> {
-        let exisiting_attendee = Self::_get_attendee_from_caller(attendee_principal);
-
+        // Create the initial invite
         let invite = Invite {
             event_identifier,
             invite_type: InviteType::OwnerRequest,
@@ -434,40 +386,48 @@ impl Store {
             created_at: time(),
         };
 
-        match exisiting_attendee {
+        match Self::_get_attendee_from_caller(attendee_principal) {
+            // If the attendee is not found, create a new attendee and add the invite to the invites array
             None => {
                 let attendee = Attendee {
                     principal: attendee_principal,
                     joined: vec![],
                     invites: vec![invite],
                 };
-                DATA.with(|data| Data::add_entry(data, attendee, Some("mbr".to_string())))
+                // Add the attendee to the data canister
+                DATA.with(|data| Data::add_entry(data, attendee, Some("eae".to_string())))
             }
+            // If the attendee is found
             Some((_identifier, mut _attendee)) => {
+                // add the invite to the invites array
                 _attendee.invites.push(invite);
+                // Update the attendee in the data canister
                 DATA.with(|data| Data::update_entry(data, _identifier, _attendee))
             }
         }
     }
 
+    // Method to accept an invite as a admin
     pub fn accept_user_request_event_invite(
         attendee_principal: Principal,
         event_identifier: Principal,
     ) -> Result<(Principal, Attendee), ApiError> {
-        let attendee = Self::_get_attendee_from_caller(attendee_principal);
-
-        match attendee {
+        match Self::_get_attendee_from_caller(attendee_principal) {
+            // If the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error(
                 "accept_user_request_event_invite",
                 None,
             )),
+            // If the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
+                // Find the invite in the invites array
                 let invite = _attendee
                     .invites
                     .iter()
                     .find(|i| &i.event_identifier == &event_identifier);
 
                 match invite {
+                    // If the invite is not found, return an error
                     None => Err(api_error(
                         ApiErrorType::NotFound,
                         "NO_INVITE_FOUND",
@@ -476,7 +436,9 @@ impl Store {
                         "accept_user_request_event_invite",
                         None,
                     )),
+                    // If the invite is found, continue
                     Some(_invite) => {
+                        // If the invite type is not a user request, return an error
                         if _invite.invite_type != InviteType::UserRequest {
                             return Err(api_error(
                                 ApiErrorType::BadRequest,
@@ -487,13 +449,14 @@ impl Store {
                                 None,
                             ));
                         }
-
+                        // Remove the invite from the invites array
                         _attendee.invites = _attendee
                             .invites
                             .into_iter()
                             .filter(|i| &i.event_identifier != &event_identifier)
                             .collect();
 
+                        // Add the event to the joined array
                         _attendee.joined.push(Join {
                             event_identifier,
                             group_identifier: event_identifier,
@@ -501,8 +464,11 @@ impl Store {
                             created_at: time(),
                         });
 
+                        // Update the attendee in the data canister
                         let result =
                             DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+
+                        // Update the attendee count on the event canister (fire-and-forget)
                         Self::update_attendee_count_on_event(&event_identifier);
                         result
                     }
@@ -511,24 +477,28 @@ impl Store {
         }
     }
 
+    // Method to accept an invite as a user
     pub fn accept_owner_request_event_invite(
         caller: Principal,
         event_identifier: Principal,
     ) -> Result<(Principal, Attendee), ApiError> {
         DATA.with(|data| {
-            let existing_attendee = Self::_get_attendee_from_caller(caller);
-
-            match existing_attendee {
+            match Self::_get_attendee_from_caller(caller) {
+                // If the attendee is not found, return an error
                 None => Err(Self::_attendee_not_found_error(
                     "accept_owner_request_event_invite",
                     None,
                 )),
+                // If the attendee is found, continue
                 Some((_identifier, mut _attendee)) => {
+                    // Find the invite in the invites array
                     let invite = _attendee
                         .invites
                         .iter()
                         .find(|i| &i.event_identifier == &event_identifier);
+
                     match invite {
+                        // If the invite is not found, return an error
                         None => Err(api_error(
                             ApiErrorType::NotFound,
                             "NO_INVITE_FOUND",
@@ -537,7 +507,9 @@ impl Store {
                             "accept_owner_request_event_invite",
                             None,
                         )),
+                        // If the invite is found, continue
                         Some(_invite) => {
+                            // If the invite type is not a owner request, return an error
                             if _invite.invite_type != InviteType::OwnerRequest {
                                 return Err(api_error(
                                     ApiErrorType::BadRequest,
@@ -549,6 +521,7 @@ impl Store {
                                 ));
                             }
 
+                            // Remove the invite from the invites array
                             _attendee.invites = _attendee
                                 .invites
                                 .iter()
@@ -556,13 +529,17 @@ impl Store {
                                 .cloned()
                                 .collect();
 
+                            // Add the event to the joined array
                             _attendee.joined.push(Join {
                                 event_identifier,
                                 updated_at: time(),
                                 created_at: time(),
                                 group_identifier: event_identifier,
                             });
+
+                            // Update the attendee in the data canister
                             let response = Data::update_entry(data, _identifier, _attendee);
+                            // Update the attendee count on the event canister (fire-and-forget)
                             Self::update_attendee_count_on_event(&event_identifier);
                             response
                         }
@@ -572,10 +549,12 @@ impl Store {
         })
     }
 
+    // Method to get the event privacy and owner (inter-canister call)
     async fn _get_event_privacy_and_owner(
         event_identifier: Principal,
         group_identifier: Principal,
     ) -> Result<(Principal, Privacy), ApiError> {
+        // Call the get_event_privacy_and_owner method on the event canister
         let event_privacy_response: Result<(Result<(Principal, Privacy), ApiError>,), _> =
             call::call(
                 Identifier::decode(&event_identifier).1,
@@ -585,6 +564,7 @@ impl Store {
             .await;
 
         DATA.with(|data| match event_privacy_response {
+            // If the inter-canister call fails, return an error
             Err(err) => Err(api_error(
                 ApiErrorType::BadRequest,
                 "INTER_CANISTER_CALL_FAILED",
@@ -593,6 +573,7 @@ impl Store {
                 "get_event_privacy_and_owner",
                 None,
             )),
+            // If the inter-canister call succeeds, continue and return the response
             Ok((_event_privacy,)) => match _event_privacy {
                 Err(err) => Err(err),
                 Ok(__event_privacy) => Ok(__event_privacy),
@@ -600,6 +581,7 @@ impl Store {
         })
     }
 
+    // Method used to map the attendee to a joined attendee response
     fn map_attendee_to_joined_attendee_response(
         identifier: &Principal,
         attendee: &Attendee,
@@ -613,6 +595,7 @@ impl Store {
         }
     }
 
+    // Method used to map the attendee to an invite attendee response
     fn map_attendee_to_invite_attendee_response(
         identifier: &Principal,
         attendee: &Attendee,
@@ -635,6 +618,7 @@ impl Store {
         }
     }
 
+    // Method to get the attendee from the caller principal
     fn _get_attendee_from_caller(caller: Principal) -> Option<(Principal, Attendee)> {
         let attendees = DATA.with(|data| Data::get_entries(data));
         attendees
@@ -642,6 +626,7 @@ impl Store {
             .find(|(_identifier, _attendee)| _attendee.principal == caller)
     }
 
+    // Method to get the attendee count for an event
     fn _get_attendee_count_for_event(group_identifier: &Principal) -> usize {
         let attendees = DATA.with(|data| Data::get_entries(data));
         attendees
@@ -655,6 +640,7 @@ impl Store {
             .count()
     }
 
+    // Default error for when an attendee is not found
     fn _attendee_not_found_error(method_name: &str, inputs: Option<Vec<String>>) -> ApiError {
         api_error(
             ApiErrorType::NotFound,
@@ -666,6 +652,7 @@ impl Store {
         )
     }
 
+    // Method to add the owner of an event as an attendee
     pub fn add_owner_as_attendee(
         user_principal: Principal,
         event_identifier: Principal,
@@ -673,21 +660,26 @@ impl Store {
     ) -> Result<(), bool> {
         let attendee = Self::_get_attendee_from_caller(user_principal);
 
+        // Decode the event and group identifiers and see if they are valid
         let (_, _event_canister, _event_kind) = Identifier::decode(&event_identifier);
         let (_, _, _group_kind) = Identifier::decode(&group_identifier);
 
+        // check if it is an event identifier
         if _event_kind != "evt" {
             return Err(false);
         }
 
+        // check if it is a group identifier
         if _group_kind != "grp" {
             return Err(false);
         }
 
+        // Check if the caller is the event canister
         if caller() != _event_canister {
             return Err(false);
         }
 
+        // Create the intial join object
         let join = Join {
             event_identifier: event_identifier.clone(),
             created_at: time(),
@@ -696,24 +688,30 @@ impl Store {
         };
 
         match attendee {
+            // If the attendee does not exist, create a new attendee and add the join to
             None => {
                 let attendee = Attendee {
                     principal: user_principal,
                     joined: vec![join],
                     invites: vec![],
                 };
-                let _ = DATA.with(|data| Data::add_entry(data, attendee, Some("mbr".to_string())));
+                // Add the attendee to the attendees
+                let _ = DATA.with(|data| Data::add_entry(data, attendee, Some("eae".to_string())));
                 Ok(())
             }
+            // If the attendee exists, continue
             Some((_identifier, mut _attendee)) => {
+                // If the attendee has already joined the event, return an error
                 if _attendee
                     .joined
                     .iter()
                     .any(|j| &j.event_identifier == &event_identifier)
                 {
                     return Err(true);
+                    // If the attendee has not joined the event, add the join to the attendee
                 } else {
                     _attendee.joined.push(join);
+                    // Update the attendee
                     let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
                     return Ok(());
                 }
@@ -721,16 +719,22 @@ impl Store {
         }
     }
 
+    // Method to update the attendee count on the event
     #[allow(unused_must_use)]
     fn update_attendee_count_on_event(event_identifier: &Principal) -> () {
+        // Get the attendee count for the event
         let event_attendees_count_array =
             Self::get_event_attendees_count(vec![event_identifier.clone()]);
+
+        // Set the initial count to 0
         let mut count = 0;
 
+        // If the attendee count array is not empty, set the count to the first element
         if event_attendees_count_array.len() > 0 {
             count = event_attendees_count_array[0].1;
         };
 
+        // Decode the event identifier and call the update attendee count method on the event
         let (_, event_canister, _) = Identifier::decode(event_identifier);
         call::call::<(Principal, Principal, usize), ()>(
             event_canister,
@@ -739,6 +743,7 @@ impl Store {
         );
     }
 
+    // This method is used for role / permission based access control
     pub async fn can_write(
         caller: Principal,
         group_identifier: Principal,
@@ -754,6 +759,7 @@ impl Store {
         .await
     }
 
+    // This method is used for role / permission based access control
     pub async fn can_read(
         caller: Principal,
         group_identifier: Principal,
@@ -769,6 +775,7 @@ impl Store {
         .await
     }
 
+    // This method is used for role / permission based access control
     pub async fn can_edit(
         caller: Principal,
         group_identifier: Principal,
@@ -784,6 +791,7 @@ impl Store {
         .await
     }
 
+    // This method is used for role / permission based access control
     pub async fn can_delete(
         caller: Principal,
         group_identifier: Principal,
@@ -799,6 +807,7 @@ impl Store {
         .await
     }
 
+    // This method is used for role / permission based access control
     async fn check_permission(
         caller: Principal,
         group_identifier: Principal,
