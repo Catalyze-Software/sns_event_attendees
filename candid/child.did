@@ -9,6 +9,11 @@ type ApiError = variant {
   Unexpected : ErrorMessage;
   BadRequest : ErrorMessage;
 };
+type Attendee = record {
+  "principal" : principal;
+  invites : vec Invite;
+  joined : vec Join;
+};
 type ErrorMessage = record {
   tag : text;
   message : text;
@@ -32,31 +37,27 @@ type Invite = record {
   group_identifier : principal;
   invite_type : InviteType;
   created_at : nat64;
+  event_identifier : principal;
 };
-type InviteMemberResponse = record {
+type InviteAttendeeResponse = record {
   "principal" : principal;
   group_identifier : principal;
-  invite : Invite;
-  member_identifier : principal;
+  attendee_identifier : principal;
+  invite_type : InviteType;
+  event_identifier : principal;
 };
-type InviteType = variant { OwnerRequest; UserRequest };
+type InviteType = variant { None; OwnerRequest; UserRequest };
 type Join = record {
   updated_at : nat64;
   group_identifier : principal;
   created_at : nat64;
-  roles : vec text;
+  event_identifier : principal;
 };
-type JoinedMemberResponse = record {
+type JoinedAttendeeResponse = record {
   "principal" : principal;
   group_identifier : principal;
-  member_identifier : principal;
-  roles : vec text;
-};
-type Member = record {
-  "principal" : principal;
-  invites : vec Invite;
-  joined : vec Join;
-  profile_identifier : principal;
+  attendee_identifier : principal;
+  event_identifier : principal;
 };
 type Metadata = record {
   updated_at : nat64;
@@ -71,48 +72,57 @@ type Metadata = record {
   entries_count : nat64;
   parent : principal;
 };
-type Result = variant { Ok : record { principal; Member }; Err : ApiError };
+type Result = variant { Ok : record { principal; Attendee }; Err : ApiError };
 type Result_1 = variant { Ok; Err : ApiError };
-type Result_2 = variant { Ok : principal; Err : ApiError };
-type Result_3 = variant { Ok; Err };
-type Result_4 = variant { Ok : vec InviteMemberResponse; Err : ApiError };
-type Result_5 = variant { Ok : JoinedMemberResponse; Err : ApiError };
-type Result_6 = variant { Ok : vec JoinedMemberResponse; Err : ApiError };
-type Result_7 = variant { Ok : record { principal; vec text }; Err : text };
-type Result_8 = variant { Ok : Metadata; Err : ApiError };
+type Result_2 = variant { Ok; Err : bool };
+type Result_3 = variant { Ok : vec JoinedAttendeeResponse; Err : ApiError };
+type Result_4 = variant { Ok : vec InviteAttendeeResponse; Err : ApiError };
+type Result_5 = variant { Ok : Metadata; Err : ApiError };
 type UpdateMessage = record { canister_principal : principal; message : text };
 type ValidationResponse = record { field : text; message : text };
 service : (principal, text, nat64) -> {
   __get_candid_interface_tmp_hack : () -> (text) query;
   accept_cycles : () -> (nat64);
-  accept_owner_request_group_invite : (principal) -> (Result);
-  accept_user_request_group_invite : (principal, principal) -> (Result);
+  accept_owner_request_event_invite : (principal) -> (Result);
+  accept_user_request_event_invite : (
+      principal,
+      principal,
+      principal,
+      principal,
+    ) -> (Result);
   add_entry_by_parent : (vec nat8) -> (Result_1);
-  add_owner : (principal, principal) -> (Result_2);
-  assign_role : (text, principal, principal) -> (Result_3);
-  create_empty_member : (principal, principal) -> (Result_2);
-  get_group_invites : (principal) -> (Result_4);
-  get_group_invites_count : (vec principal) -> (
+  add_owner_as_attendee : (principal, principal, principal) -> (Result_2);
+  get_chunked_invite_data : (principal, nat64, nat64) -> (
+      vec nat8,
+      record { nat64; nat64 },
+    ) query;
+  get_chunked_join_data : (principal, nat64, nat64) -> (
+      vec nat8,
+      record { nat64; nat64 },
+    ) query;
+  get_event_attendees : (principal) -> (Result_3) query;
+  get_event_attendees_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_group_member : (principal, principal) -> (Result_5) query;
-  get_group_members : (principal) -> (Result_6) query;
-  get_group_members_count : (vec principal) -> (
+  get_event_invites : (principal, principal, principal) -> (Result_4);
+  get_event_invites_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_groups_for_members : (vec principal) -> (
-      vec record { principal; vec principal },
-    ) query;
-  get_member_roles : (principal, principal) -> (Result_7) query;
-  get_metadata : () -> (Result_8) query;
+  get_metadata : () -> (Result_5) query;
   get_self : () -> (Result) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
-  invite_to_group : (principal, principal) -> (Result);
-  join_group : (principal, opt text) -> (Result);
-  leave_group : (principal) -> (Result_1);
+  invite_to_event : (principal, principal, principal, principal) -> (Result);
+  join_event : (principal, principal) -> (Result);
+  leave_event : (principal) -> (Result_1);
+  remove_attendee_from_event : (principal, principal, principal, principal) -> (
+      Result_1,
+    );
+  remove_attendee_invite_from_event : (
+      principal,
+      principal,
+      principal,
+      principal,
+    ) -> (Result_1);
   remove_invite : (principal) -> (Result_1);
-  remove_member_from_group : (principal, principal) -> (Result_1);
-  remove_member_invite_from_group : (principal, principal) -> (Result_1);
-  remove_role : (text, principal, principal) -> (Result_3);
   sanity_check : () -> (text) query;
 }

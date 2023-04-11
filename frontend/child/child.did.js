@@ -1,5 +1,6 @@
 export const idlFactory = ({ IDL }) => {
   const InviteType = IDL.Variant({
+    'None' : IDL.Null,
     'OwnerRequest' : IDL.Null,
     'UserRequest' : IDL.Null,
   });
@@ -8,18 +9,18 @@ export const idlFactory = ({ IDL }) => {
     'group_identifier' : IDL.Principal,
     'invite_type' : InviteType,
     'created_at' : IDL.Nat64,
+    'event_identifier' : IDL.Principal,
   });
   const Join = IDL.Record({
     'updated_at' : IDL.Nat64,
     'group_identifier' : IDL.Principal,
     'created_at' : IDL.Nat64,
-    'roles' : IDL.Vec(IDL.Text),
+    'event_identifier' : IDL.Principal,
   });
-  const Member = IDL.Record({
+  const Attendee = IDL.Record({
     'principal' : IDL.Principal,
     'invites' : IDL.Vec(Invite),
     'joined' : IDL.Vec(Join),
-    'profile_identifier' : IDL.Principal,
   });
   const ErrorMessage = IDL.Record({
     'tag' : IDL.Text,
@@ -47,39 +48,31 @@ export const idlFactory = ({ IDL }) => {
     'BadRequest' : ErrorMessage,
   });
   const Result = IDL.Variant({
-    'Ok' : IDL.Tuple(IDL.Principal, Member),
+    'Ok' : IDL.Tuple(IDL.Principal, Attendee),
     'Err' : ApiError,
   });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ApiError });
-  const Result_2 = IDL.Variant({ 'Ok' : IDL.Principal, 'Err' : ApiError });
-  const Result_3 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null });
-  const InviteMemberResponse = IDL.Record({
+  const Result_2 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Bool });
+  const JoinedAttendeeResponse = IDL.Record({
     'principal' : IDL.Principal,
     'group_identifier' : IDL.Principal,
-    'invite' : Invite,
-    'member_identifier' : IDL.Principal,
+    'attendee_identifier' : IDL.Principal,
+    'event_identifier' : IDL.Principal,
+  });
+  const Result_3 = IDL.Variant({
+    'Ok' : IDL.Vec(JoinedAttendeeResponse),
+    'Err' : ApiError,
+  });
+  const InviteAttendeeResponse = IDL.Record({
+    'principal' : IDL.Principal,
+    'group_identifier' : IDL.Principal,
+    'attendee_identifier' : IDL.Principal,
+    'invite_type' : InviteType,
+    'event_identifier' : IDL.Principal,
   });
   const Result_4 = IDL.Variant({
-    'Ok' : IDL.Vec(InviteMemberResponse),
+    'Ok' : IDL.Vec(InviteAttendeeResponse),
     'Err' : ApiError,
-  });
-  const JoinedMemberResponse = IDL.Record({
-    'principal' : IDL.Principal,
-    'group_identifier' : IDL.Principal,
-    'member_identifier' : IDL.Principal,
-    'roles' : IDL.Vec(IDL.Text),
-  });
-  const Result_5 = IDL.Variant({
-    'Ok' : JoinedMemberResponse,
-    'Err' : ApiError,
-  });
-  const Result_6 = IDL.Variant({
-    'Ok' : IDL.Vec(JoinedMemberResponse),
-    'Err' : ApiError,
-  });
-  const Result_7 = IDL.Variant({
-    'Ok' : IDL.Tuple(IDL.Principal, IDL.Vec(IDL.Text)),
-    'Err' : IDL.Text,
   });
   const Metadata = IDL.Record({
     'updated_at' : IDL.Nat64,
@@ -94,7 +87,7 @@ export const idlFactory = ({ IDL }) => {
     'entries_count' : IDL.Nat64,
     'parent' : IDL.Principal,
   });
-  const Result_8 = IDL.Variant({ 'Ok' : Metadata, 'Err' : ApiError });
+  const Result_5 = IDL.Variant({ 'Ok' : Metadata, 'Err' : ApiError });
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
     'method' : IDL.Text,
@@ -110,77 +103,69 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'accept_cycles' : IDL.Func([], [IDL.Nat64], []),
-    'accept_owner_request_group_invite' : IDL.Func(
+    'accept_owner_request_event_invite' : IDL.Func(
         [IDL.Principal],
         [Result],
         [],
       ),
-    'accept_user_request_group_invite' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
+    'accept_user_request_event_invite' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
         [Result],
         [],
       ),
     'add_entry_by_parent' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result_1], []),
-    'add_owner' : IDL.Func([IDL.Principal, IDL.Principal], [Result_2], []),
-    'assign_role' : IDL.Func(
-        [IDL.Text, IDL.Principal, IDL.Principal],
-        [Result_3],
-        [],
-      ),
-    'create_empty_member' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
+    'add_owner_as_attendee' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal],
         [Result_2],
         [],
       ),
-    'get_group_invites' : IDL.Func([IDL.Principal], [Result_4], []),
-    'get_group_invites_count' : IDL.Func(
+    'get_chunked_invite_data' : IDL.Func(
+        [IDL.Principal, IDL.Nat64, IDL.Nat64],
+        [IDL.Vec(IDL.Nat8), IDL.Tuple(IDL.Nat64, IDL.Nat64)],
+        ['query'],
+      ),
+    'get_chunked_join_data' : IDL.Func(
+        [IDL.Principal, IDL.Nat64, IDL.Nat64],
+        [IDL.Vec(IDL.Nat8), IDL.Tuple(IDL.Nat64, IDL.Nat64)],
+        ['query'],
+      ),
+    'get_event_attendees' : IDL.Func([IDL.Principal], [Result_3], ['query']),
+    'get_event_attendees_count' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64))],
         ['query'],
       ),
-    'get_group_member' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
-        [Result_5],
-        ['query'],
+    'get_event_invites' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal],
+        [Result_4],
+        [],
       ),
-    'get_group_members' : IDL.Func([IDL.Principal], [Result_6], ['query']),
-    'get_group_members_count' : IDL.Func(
+    'get_event_invites_count' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64))],
         ['query'],
       ),
-    'get_groups_for_members' : IDL.Func(
-        [IDL.Vec(IDL.Principal)],
-        [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Vec(IDL.Principal)))],
-        ['query'],
-      ),
-    'get_member_roles' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
-        [Result_7],
-        ['query'],
-      ),
-    'get_metadata' : IDL.Func([], [Result_8], ['query']),
+    'get_metadata' : IDL.Func([], [Result_5], ['query']),
     'get_self' : IDL.Func([], [Result], ['query']),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
-    'invite_to_group' : IDL.Func([IDL.Principal, IDL.Principal], [Result], []),
-    'join_group' : IDL.Func([IDL.Principal, IDL.Opt(IDL.Text)], [Result], []),
-    'leave_group' : IDL.Func([IDL.Principal], [Result_1], []),
+    'invite_to_event' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
+        [Result],
+        [],
+      ),
+    'join_event' : IDL.Func([IDL.Principal, IDL.Principal], [Result], []),
+    'leave_event' : IDL.Func([IDL.Principal], [Result_1], []),
+    'remove_attendee_from_event' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
+        [Result_1],
+        [],
+      ),
+    'remove_attendee_invite_from_event' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
+        [Result_1],
+        [],
+      ),
     'remove_invite' : IDL.Func([IDL.Principal], [Result_1], []),
-    'remove_member_from_group' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
-        [Result_1],
-        [],
-      ),
-    'remove_member_invite_from_group' : IDL.Func(
-        [IDL.Principal, IDL.Principal],
-        [Result_1],
-        [],
-      ),
-    'remove_role' : IDL.Func(
-        [IDL.Text, IDL.Principal, IDL.Principal],
-        [Result_3],
-        [],
-      ),
     'sanity_check' : IDL.Func([], [IDL.Text], ['query']),
   });
 };

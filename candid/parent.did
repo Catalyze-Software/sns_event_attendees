@@ -34,6 +34,34 @@ type HttpResponse = record {
   body : vec nat8;
   headers : vec HttpHeader;
 };
+type InviteAttendeeResponse = record {
+  "principal" : principal;
+  group_identifier : principal;
+  attendee_identifier : principal;
+  invite_type : InviteType;
+  event_identifier : principal;
+};
+type InviteType = variant { None; OwnerRequest; UserRequest };
+type JoinedAttendeeResponse = record {
+  "principal" : principal;
+  group_identifier : principal;
+  attendee_identifier : principal;
+  event_identifier : principal;
+};
+type PagedResponse = record {
+  total : nat64;
+  data : vec InviteAttendeeResponse;
+  page : nat64;
+  limit : nat64;
+  number_of_pages : nat64;
+};
+type PagedResponse_1 = record {
+  total : nat64;
+  data : vec JoinedAttendeeResponse;
+  page : nat64;
+  limit : nat64;
+  number_of_pages : nat64;
+};
 type Result = variant { Ok : principal; Err : ApiError };
 type Result_1 = variant { Ok : ScalableCanisterDetails; Err : text };
 type ScalableCanisterDetails = record {
@@ -46,17 +74,14 @@ type ScalableCanisterDetails = record {
 type UpdateMessage = record { canister_principal : principal; message : text };
 type ValidationResponse = record { field : text; message : text };
 type WasmVersion = variant { None; Version : nat64; Custom };
-service : (principal) -> {
+service : () -> {
   __get_candid_interface_tmp_hack : () -> (text) query;
   accept_cycles : () -> (nat64);
-  close_child_canister_and_spawn_sibling : (
-      principal,
-      nat64,
-      vec nat8,
-      opt principal,
-    ) -> (Result);
+  close_child_canister_and_spawn_sibling : (nat64, vec nat8) -> (Result);
   get_available_canister : () -> (Result_1) query;
   get_canisters : () -> (vec ScalableCanisterDetails) query;
+  get_invites : (principal, nat64, nat64) -> (PagedResponse) query;
   get_latest_wasm_version : () -> (WasmVersion) query;
+  get_members : (principal, nat64, nat64) -> (PagedResponse_1) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
 }
