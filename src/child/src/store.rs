@@ -26,6 +26,8 @@ use shared::attendee_model::{
     Attendee, Invite, InviteAttendeeResponse, InviteType, Join, JoinedAttendeeResponse,
 };
 
+use crate::IDENTIFIER_KIND;
+
 thread_local! {
     pub static DATA: RefCell<Data<Attendee>>  = RefCell::new(Data::default());
 }
@@ -105,7 +107,11 @@ impl Store {
                     Ok(_updated_attendee) => match Self::_get_attendee_from_caller(caller) {
                         None => {
                             let result = DATA.with(|data| {
-                                Data::add_entry(data, _updated_attendee, Some("eae".to_string()))
+                                Data::add_entry(
+                                    data,
+                                    _updated_attendee,
+                                    Some(IDENTIFIER_KIND.to_string()),
+                                )
                             });
                             Self::update_attendee_count_on_event(&event_identifier);
                             result
@@ -396,7 +402,7 @@ impl Store {
                     invites: vec![invite],
                 };
                 // Add the attendee to the data canister
-                DATA.with(|data| Data::add_entry(data, attendee, Some("eae".to_string())))
+                DATA.with(|data| Data::add_entry(data, attendee, Some(IDENTIFIER_KIND.to_string())))
             }
             // If the attendee is found
             Some((_identifier, mut _attendee)) => {
@@ -697,7 +703,9 @@ impl Store {
                     invites: vec![],
                 };
                 // Add the attendee to the attendees
-                let _ = DATA.with(|data| Data::add_entry(data, attendee, Some("eae".to_string())));
+                let _ = DATA.with(|data| {
+                    Data::add_entry(data, attendee, Some(IDENTIFIER_KIND.to_string()))
+                });
                 Ok(())
             }
             // If the attendee exists, continue

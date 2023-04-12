@@ -4,6 +4,8 @@ use candid::{candid_method, Principal};
 use ic_cdk::{caller, storage, timer::set_timer};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query};
 
+use crate::CHILD_WASM_VERSION;
+
 use super::store::{ScalableData, DATA};
 
 // Stores the data in stable storage before upgrading the canister.
@@ -13,12 +15,12 @@ pub fn pre_upgrade() {
         .expect("Something went wrong while upgrading");
 }
 
-// Restores the data from stable- to heap storage after upgrading the canister.
 #[post_upgrade]
+// Restores the data from stable- to heap storage after upgrading the canister.
 pub fn post_upgrade() {
     let (mut old_store,): (ScalableData,) = storage::stable_restore().unwrap();
     // Get the child wasm data from the old store
-    let child_wasm_data = ScalableData::get_child_wasm_data(&old_store, 0_0_2);
+    let child_wasm_data = ScalableData::get_child_wasm_data(&old_store, CHILD_WASM_VERSION);
     match child_wasm_data {
         // If the child wasm data is found, update the data in the new store
         Ok(_child_wasm_data) => {
@@ -47,7 +49,7 @@ pub fn post_upgrade() {
 fn init() {
     DATA.with(|v| {
         let mut data = v.borrow_mut();
-        data.name = "member_parent".to_string();
+        data.name = "event_attendees_parent".to_string();
         data.parent = caller();
         // Set the child WASM data on first deploy from the file system
         data.child_wasm_data = ScalableData::get_child_wasm_data(&data, 0_0_1).unwrap();

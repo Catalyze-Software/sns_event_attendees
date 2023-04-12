@@ -155,6 +155,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'join_event' : IDL.Func([IDL.Principal, IDL.Principal], [Result], []),
     'leave_event' : IDL.Func([IDL.Principal], [Result_1], []),
+    'migration_add_event_attendees' : IDL.Func(
+        [IDL.Vec(IDL.Tuple(IDL.Principal, Attendee))],
+        [],
+        [],
+      ),
     'remove_attendee_from_event' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
         [Result_1],

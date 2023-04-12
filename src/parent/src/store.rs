@@ -253,7 +253,7 @@ impl ScalableData {
                 // upgrade the child canister
                 let upgrade_result = canister
                     .install_code(
-                        InstallCodeMode::Upgrade,
+                        InstallCodeMode::Reinstall,
                         data.child_wasm_data.bytes.clone(),
                         (),
                     )
@@ -427,7 +427,7 @@ impl ScalableData {
         }
 
         let details = WasmDetails {
-            label: "child_member_canister".to_string(),
+            label: "child_event_attendee_canister".to_string(),
             bytes,
             wasm_type: CanisterType::ScalableChild,
             wasm_version: WasmVersion::Version(version),

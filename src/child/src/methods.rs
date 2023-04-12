@@ -1,13 +1,24 @@
 use candid::{candid_method, Principal};
 use ic_cdk::caller;
 use ic_cdk_macros::{query, update};
+use ic_scalable_canister::store::Data;
 use ic_scalable_misc::enums::api_error_type::ApiError;
 
 use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
 
-use crate::store::DATA;
+use crate::{store::DATA, IDENTIFIER_KIND};
 
 use super::store::Store;
+
+#[update]
+#[candid_method(update)]
+pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> () {
+    DATA.with(|data| {
+        for attendee in attendees {
+            let _ = Data::add_entry(data, attendee.1, Some(IDENTIFIER_KIND.to_string()));
+        }
+    })
+}
 
 // Method to join an existing event
 // The method is async because it optionally creates a new canister is created

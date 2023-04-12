@@ -114,6 +114,7 @@ service : (principal, text, nat64) -> {
   invite_to_event : (principal, principal, principal, principal) -> (Result);
   join_event : (principal, principal) -> (Result);
   leave_event : (principal) -> (Result_1);
+  migration_add_event_attendees : (vec record { principal; Attendee }) -> ();
   remove_attendee_from_event : (principal, principal, principal, principal) -> (
       Result_1,
     );

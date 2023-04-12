@@ -135,6 +135,10 @@ export interface _SERVICE {
   >,
   'join_event' : ActorMethod<[Principal, Principal], Result>,
   'leave_event' : ActorMethod<[Principal], Result_1>,
+  'migration_add_event_attendees' : ActorMethod<
+    [Array<[Principal, Attendee]>],
+    undefined
+  >,
   'remove_attendee_from_event' : ActorMethod<
     [Principal, Principal, Principal, Principal],
     Result_1
