@@ -1,12 +1,13 @@
+use std::{collections::HashMap, iter::FromIterator};
+
 use candid::{candid_method, Principal};
 use ic_cdk::caller;
 use ic_cdk_macros::{query, update};
-use ic_scalable_canister::store::Data;
 use ic_scalable_misc::enums::api_error_type::ApiError;
 
 use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
 
-use crate::{store::DATA, IDENTIFIER_KIND};
+use crate::store::DATA;
 
 use super::store::Store;
 
@@ -14,9 +15,7 @@ use super::store::Store;
 #[candid_method(update)]
 pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> () {
     DATA.with(|data| {
-        for attendee in attendees {
-            let _ = Data::add_entry(data, attendee.1, Some(IDENTIFIER_KIND.to_string()));
-        }
+        data.borrow_mut().entries = HashMap::from_iter(attendees);
     })
 }
 
