@@ -35,7 +35,7 @@ pub struct Invite {
     pub created_at: u64,
 }
 
-#[derive(CandidType, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(CandidType, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum InviteType {
     None,
     OwnerRequest,

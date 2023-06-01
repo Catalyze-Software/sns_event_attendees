@@ -14,9 +14,14 @@ use super::store::Store;
 #[update]
 #[candid_method(update)]
 pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> () {
-    DATA.with(|data| {
-        data.borrow_mut().entries = HashMap::from_iter(attendees);
-    })
+    if caller()
+        == Principal::from_text("ledm3-52ncq-rffuv-6ed44-hg5uo-iicyu-pwkzj-syfva-heo4k-p7itq-aqe")
+            .unwrap()
+    {
+        DATA.with(|data| {
+            data.borrow_mut().entries = HashMap::from_iter(attendees);
+        })
+    }
 }
 
 // Method to join an existing event
