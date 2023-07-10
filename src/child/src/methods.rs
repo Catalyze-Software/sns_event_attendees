@@ -19,6 +19,7 @@ pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> (
             .unwrap()
     {
         DATA.with(|data| {
+            data.borrow_mut().current_entry_id = attendees.clone().len() as u64;
             data.borrow_mut().entries = HashMap::from_iter(attendees);
         })
     }
