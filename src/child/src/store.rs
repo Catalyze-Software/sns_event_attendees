@@ -1,4 +1,4 @@
-use std::{cell::RefCell, vec};
+use std::{cell::RefCell, collections::HashMap, iter::FromIterator, vec};
 
 use candid::Principal;
 use ic_cdk::{
@@ -59,11 +59,7 @@ impl Store {
                     // if the attendee is found, continue
                     Some((_identifier, mut _exisiting_attendee)) => {
                         // if the event identifier is already found in the joined array, throw an error
-                        if _exisiting_attendee
-                            .joined
-                            .iter()
-                            .any(|m| &m.event_identifier == &event_identifier)
-                        {
+                        if let Some(_) = _exisiting_attendee.joined.get(&event_identifier) {
                             return Err(api_error(
                                 ApiErrorType::BadRequest,
                                 "ALREADY_JOINED",
@@ -74,11 +70,7 @@ impl Store {
                             ));
                         }
                         // if the event identifier is already found in the invites array, throw an error
-                        if _exisiting_attendee
-                            .invites
-                            .iter()
-                            .any(|m| &m.event_identifier == &event_identifier)
-                        {
+                        if let Some(_) = _exisiting_attendee.invites.get(&event_identifier) {
                             return Err(api_error(
                                 ApiErrorType::BadRequest,
                                 "PENDING_INVITE",
@@ -144,16 +136,7 @@ impl Store {
             )),
             // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
-                // filter out the event from the joined array
-                let joined: Vec<Join> = _attendee
-                    .joined
-                    .into_iter()
-                    .filter(|j| &j.event_identifier != &event_identifier)
-                    .collect();
-
-                // set the joined array to the filtered array on the attendee
-                _attendee.joined = joined;
-                // update the attendee
+                _attendee.joined.remove(&event_identifier);
                 let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
 
                 // update the attendee count on the event canister (fire-and-forget)
@@ -175,16 +158,7 @@ impl Store {
             )),
             // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
-                // filter out the event from the invites array
-                let invites: Vec<Invite> = _attendee
-                    .invites
-                    .into_iter()
-                    .filter(|j| &j.event_identifier != &event_identifier)
-                    .collect();
-
-                // set the invites array to the filtered array on the attendee
-                _attendee.invites = invites;
-                // update the attendee
+                _attendee.invites.remove(&event_identifier);
                 let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
                 Ok(())
             }
@@ -201,7 +175,6 @@ impl Store {
     ) -> Result<Attendee, ApiError> {
         // Create the initial join entry
         let join = Join {
-            event_identifier,
             group_identifier,
             updated_at: time(),
             created_at: time(),
@@ -209,7 +182,6 @@ impl Store {
 
         // Create the initial invite entry
         let invite = Invite {
-            event_identifier,
             group_identifier,
             invite_type: InviteType::UserRequest,
             updated_at: time(),
@@ -223,12 +195,12 @@ impl Store {
                 // If the attendee is not found, create a new one and add the join to the joined array
                 None => Ok(Attendee {
                     principal: caller,
-                    joined: vec![join],
-                    invites: vec![],
+                    joined: HashMap::from_iter(vec![(event_identifier, join)]),
+                    invites: HashMap::new(),
                 }),
                 // If the attendee is found, push the join to the existing joined array
                 Some((_, mut _attendee)) => {
-                    _attendee.joined.push(join);
+                    _attendee.joined.insert(event_identifier, join);
                     Ok(_attendee)
                 }
             },
@@ -237,12 +209,12 @@ impl Store {
                 // If the attendee is not found, create a new one and add the invite to the invites array
                 None => Ok(Attendee {
                     principal: caller,
-                    joined: vec![],
-                    invites: vec![invite],
+                    joined: HashMap::new(),
+                    invites: HashMap::from_iter(vec![(event_identifier, invite)]),
                 }),
                 // If the attendee is found, push the invite to the existing invites array
                 Some((_, mut _attendee)) => {
-                    _attendee.invites.push(invite);
+                    _attendee.invites.insert(event_identifier, invite);
                     Ok(_attendee)
                 }
             },
@@ -281,7 +253,7 @@ impl Store {
                     _attendee
                         .joined
                         .iter()
-                        .any(|j| &j.event_identifier == &event_identifier)
+                        .any(|(_event_identifier, _)| _event_identifier == &event_identifier)
                 })
                 .map(|(_identifier, _attendee)| {
                     Self::map_attendee_to_joined_attendee_response(
@@ -312,7 +284,7 @@ impl Store {
                         _attendee
                             .joined
                             .iter()
-                            .any(|j| &j.event_identifier == &event_identifier)
+                            .any(|(_event_identifier, _)| _event_identifier == &event_identifier)
                     })
                     .count();
                 // Push the event identifier and the count to the attendees count array
@@ -342,7 +314,7 @@ impl Store {
                         attendee
                             .invites
                             .iter()
-                            .any(|j| &j.event_identifier == &group_identifier)
+                            .any(|(_event_identifier, _)| _event_identifier == &group_identifier)
                     })
                     .count();
                 // Push the group identifier and the count to the invite count array
@@ -364,7 +336,7 @@ impl Store {
                     _attendee
                         .invites
                         .iter()
-                        .any(|j| &j.event_identifier == &event_identifier)
+                        .any(|(_event_identifier, _)| _event_identifier == &event_identifier)
                 })
                 // Map the attendee to an invite attendee response
                 .map(|(_identifier, _attendee)| {
@@ -386,7 +358,6 @@ impl Store {
     ) -> Result<(Principal, Attendee), ApiError> {
         // Create the initial invite
         let invite = Invite {
-            event_identifier,
             invite_type: InviteType::OwnerRequest,
             group_identifier: group_identifier.clone(),
             updated_at: time(),
@@ -398,16 +369,26 @@ impl Store {
             None => {
                 let attendee = Attendee {
                     principal: attendee_principal,
-                    joined: vec![],
-                    invites: vec![invite],
+                    joined: HashMap::new(),
+                    invites: HashMap::from_iter(vec![(event_identifier, invite)]),
                 };
                 // Add the attendee to the data canister
                 DATA.with(|data| Data::add_entry(data, attendee, Some(IDENTIFIER_KIND.to_string())))
             }
             // If the attendee is found
             Some((_identifier, mut _attendee)) => {
+                if _attendee.joined.contains_key(&event_identifier) {
+                    return Err(api_error(
+                        ApiErrorType::BadRequest,
+                        "ALREADY_JOINED",
+                        "You already joined this event",
+                        DATA.with(|data| Data::get_name(data)).as_str(),
+                        "invite_to_event",
+                        None,
+                    ));
+                }
                 // add the invite to the invites array
-                _attendee.invites.push(invite);
+                _attendee.invites.insert(event_identifier, invite);
                 // Update the attendee in the data canister
                 DATA.with(|data| Data::update_entry(data, _identifier, _attendee))
             }
@@ -428,12 +409,7 @@ impl Store {
             // If the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
                 // Find the invite in the invites array
-                let invite = _attendee
-                    .invites
-                    .iter()
-                    .find(|i| &i.event_identifier == &event_identifier);
-
-                match invite {
+                match _attendee.invites.get(&event_identifier).cloned() {
                     // If the invite is not found, return an error
                     None => Err(api_error(
                         ApiErrorType::NotFound,
@@ -456,20 +432,17 @@ impl Store {
                                 None,
                             ));
                         }
-                        // Remove the invite from the invites array
-                        _attendee.invites = _attendee
-                            .invites
-                            .into_iter()
-                            .filter(|i| &i.event_identifier != &event_identifier)
-                            .collect();
 
-                        // Add the event to the joined array
-                        _attendee.joined.push(Join {
+                        // Remove the invite from the invites array
+                        _attendee.invites.remove(&event_identifier);
+                        _attendee.joined.insert(
                             event_identifier,
-                            group_identifier: event_identifier,
-                            updated_at: time(),
-                            created_at: time(),
-                        });
+                            Join {
+                                group_identifier: _invite.group_identifier,
+                                updated_at: time(),
+                                created_at: time(),
+                            },
+                        );
 
                         // Update the attendee in the data canister
                         let result =
@@ -499,12 +472,7 @@ impl Store {
                 // If the attendee is found, continue
                 Some((_identifier, mut _attendee)) => {
                     // Find the invite in the invites array
-                    let invite = _attendee
-                        .invites
-                        .iter()
-                        .find(|i| &i.event_identifier == &event_identifier);
-
-                    match invite {
+                    match _attendee.invites.get(&event_identifier).cloned() {
                         // If the invite is not found, return an error
                         None => Err(api_error(
                             ApiErrorType::NotFound,
@@ -529,20 +497,15 @@ impl Store {
                             }
 
                             // Remove the invite from the invites array
-                            _attendee.invites = _attendee
-                                .invites
-                                .iter()
-                                .filter(|i| &i.event_identifier == &event_identifier)
-                                .cloned()
-                                .collect();
-
-                            // Add the event to the joined array
-                            _attendee.joined.push(Join {
+                            _attendee.invites.remove(&event_identifier);
+                            _attendee.joined.insert(
                                 event_identifier,
-                                updated_at: time(),
-                                created_at: time(),
-                                group_identifier: event_identifier,
-                            });
+                                Join {
+                                    group_identifier: _invite.group_identifier,
+                                    updated_at: time(),
+                                    created_at: time(),
+                                },
+                            );
 
                             // Update the attendee in the data canister
                             let response = Data::update_entry(data, _identifier, _attendee);
@@ -611,7 +574,7 @@ impl Store {
         let invite = attendee
             .invites
             .iter()
-            .find(|m| &m.event_identifier == &event_identifier);
+            .find(|(_event_identifier, _)| _event_identifier == &&event_identifier);
 
         InviteAttendeeResponse {
             event_identifier,
@@ -620,7 +583,7 @@ impl Store {
             group_identifier: event_identifier,
             invite_type: match invite {
                 None => InviteType::None,
-                Some(_invite) => _invite.invite_type.clone(),
+                Some((_, _invite)) => _invite.invite_type.clone(),
             },
         }
     }
@@ -642,7 +605,7 @@ impl Store {
                 _attendee
                     .joined
                     .iter()
-                    .any(|j| &j.event_identifier == group_identifier)
+                    .any(|(_event_identfier, _)| _event_identfier == group_identifier)
             })
             .count()
     }
@@ -688,7 +651,6 @@ impl Store {
 
         // Create the intial join object
         let join = Join {
-            event_identifier: event_identifier.clone(),
             created_at: time(),
             updated_at: time(),
             group_identifier,
@@ -699,8 +661,8 @@ impl Store {
             None => {
                 let attendee = Attendee {
                     principal: user_principal,
-                    joined: vec![join],
-                    invites: vec![],
+                    joined: HashMap::from_iter(vec![(event_identifier, join)]),
+                    invites: HashMap::new(),
                 };
                 // Add the attendee to the attendees
                 let _ = DATA.with(|data| {
@@ -714,12 +676,12 @@ impl Store {
                 if _attendee
                     .joined
                     .iter()
-                    .any(|j| &j.event_identifier == &event_identifier)
+                    .any(|(_event_identifier, _)| _event_identifier == &event_identifier)
                 {
                     return Err(true);
                     // If the attendee has not joined the event, add the join to the attendee
                 } else {
-                    _attendee.joined.push(join);
+                    _attendee.joined.insert(event_identifier, join);
                     // Update the attendee
                     let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
                     return Ok(());
@@ -897,7 +859,7 @@ impl Store {
                 _attendee_data
                     .joined
                     .iter()
-                    .any(|j| &j.event_identifier == event_identifier)
+                    .any(|(_event_identifier, _)| _event_identifier == event_identifier)
             })
             // Map attendee to joined attendee response
             .map(|(_identifier, _attendee_data)| {
@@ -958,7 +920,7 @@ impl Store {
                 _attendee_data
                     .invites
                     .iter()
-                    .any(|j| &j.event_identifier == event_identifier)
+                    .any(|(_event_identifier, _)| _event_identifier == event_identifier)
             })
             // Map member to joined member response
             .map(|(_identifier, _event_data)| {

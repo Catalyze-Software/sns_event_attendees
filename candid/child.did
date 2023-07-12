@@ -11,8 +11,8 @@ type ApiError = variant {
 };
 type Attendee = record {
   "principal" : principal;
-  invites : vec Invite;
-  joined : vec Join;
+  invites : vec record { principal; Invite };
+  joined : vec record { principal; Join };
 };
 type ErrorMessage = record {
   tag : text;
@@ -37,7 +37,6 @@ type Invite = record {
   group_identifier : principal;
   invite_type : InviteType;
   created_at : nat64;
-  event_identifier : principal;
 };
 type InviteAttendeeResponse = record {
   "principal" : principal;
@@ -51,7 +50,6 @@ type Join = record {
   updated_at : nat64;
   group_identifier : principal;
   created_at : nat64;
-  event_identifier : principal;
 };
 type JoinedAttendeeResponse = record {
   "principal" : principal;

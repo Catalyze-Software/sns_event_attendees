@@ -1,26 +1,28 @@
+use std::collections::HashMap;
+
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
 
+pub type EventIdentifier = Principal;
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct Attendee {
     pub principal: Principal,
-    pub joined: Vec<Join>,
-    pub invites: Vec<Invite>,
+    pub joined: HashMap<EventIdentifier, Join>,
+    pub invites: HashMap<EventIdentifier, Invite>,
 }
 
 impl Default for Attendee {
     fn default() -> Self {
         Self {
             principal: Principal::anonymous(),
-            joined: Vec::default(),
-            invites: Vec::default(),
+            joined: Default::default(),
+            invites: Default::default(),
         }
     }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct Join {
-    pub event_identifier: Principal,
     pub group_identifier: Principal,
     pub updated_at: u64,
     pub created_at: u64,
@@ -28,7 +30,6 @@ pub struct Join {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct Invite {
-    pub event_identifier: Principal,
     pub group_identifier: Principal,
     pub invite_type: InviteType,
     pub updated_at: u64,

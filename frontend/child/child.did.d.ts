@@ -12,8 +12,8 @@ export type ApiError = { 'SerializeError' : ErrorMessage } |
   { 'BadRequest' : ErrorMessage };
 export interface Attendee {
   'principal' : Principal,
-  'invites' : Array<Invite>,
-  'joined' : Array<Join>,
+  'invites' : Array<[Principal, Invite]>,
+  'joined' : Array<[Principal, Join]>,
 }
 export interface ErrorMessage {
   'tag' : string,
@@ -38,7 +38,6 @@ export interface Invite {
   'group_identifier' : Principal,
   'invite_type' : InviteType,
   'created_at' : bigint,
-  'event_identifier' : Principal,
 }
 export interface InviteAttendeeResponse {
   'principal' : Principal,
@@ -54,7 +53,6 @@ export interface Join {
   'updated_at' : bigint,
   'group_identifier' : Principal,
   'created_at' : bigint,
-  'event_identifier' : Principal,
 }
 export interface JoinedAttendeeResponse {
   'principal' : Principal,

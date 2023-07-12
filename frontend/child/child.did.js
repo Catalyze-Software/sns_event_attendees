@@ -9,18 +9,16 @@ export const idlFactory = ({ IDL }) => {
     'group_identifier' : IDL.Principal,
     'invite_type' : InviteType,
     'created_at' : IDL.Nat64,
-    'event_identifier' : IDL.Principal,
   });
   const Join = IDL.Record({
     'updated_at' : IDL.Nat64,
     'group_identifier' : IDL.Principal,
     'created_at' : IDL.Nat64,
-    'event_identifier' : IDL.Principal,
   });
   const Attendee = IDL.Record({
     'principal' : IDL.Principal,
-    'invites' : IDL.Vec(Invite),
-    'joined' : IDL.Vec(Join),
+    'invites' : IDL.Vec(IDL.Tuple(IDL.Principal, Invite)),
+    'joined' : IDL.Vec(IDL.Tuple(IDL.Principal, Join)),
   });
   const ErrorMessage = IDL.Record({
     'tag' : IDL.Text,
