@@ -5,7 +5,7 @@ use ic_cdk::caller;
 use ic_cdk_macros::{query, update};
 use ic_scalable_misc::enums::api_error_type::ApiError;
 
-use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
+use shared::attendee_model::{Attendee, InviteAttendeeResponse, Join, JoinedAttendeeResponse};
 
 use crate::store::DATA;
 
@@ -103,6 +103,13 @@ fn get_event_attendees(
 #[candid_method(query)]
 fn get_self() -> Result<(Principal, Attendee), ApiError> {
     Store::get_self(caller())
+}
+
+// Method to get the principal joined events
+#[query]
+#[candid_method(query)]
+fn get_attending_from_principal(principal: Principal) -> Result<Vec<Join>, ApiError> {
+    Store::get_attending_from_principal(principal)
 }
 
 // Method to leave an event as a user
