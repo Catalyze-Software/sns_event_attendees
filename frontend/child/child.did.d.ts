@@ -68,8 +68,8 @@ export interface Metadata {
   'created_at' : bigint,
   'used_data' : bigint,
   'cycles' : bigint,
-  'is_available' : boolean,
   'identifier' : bigint,
+  '_available' : boolean,
   'entries_count' : bigint,
   'parent' : Principal,
 }
@@ -79,13 +79,11 @@ export type Result_1 = { 'Ok' : null } |
   { 'Err' : ApiError };
 export type Result_2 = { 'Ok' : null } |
   { 'Err' : boolean };
-export type Result_3 = { 'Ok' : Array<Join> } |
+export type Result_3 = { 'Ok' : Array<JoinedAttendeeResponse> } |
   { 'Err' : ApiError };
-export type Result_4 = { 'Ok' : Array<JoinedAttendeeResponse> } |
+export type Result_4 = { 'Ok' : Array<InviteAttendeeResponse> } |
   { 'Err' : ApiError };
-export type Result_5 = { 'Ok' : Array<InviteAttendeeResponse> } |
-  { 'Err' : ApiError };
-export type Result_6 = { 'Ok' : Metadata } |
+export type Result_5 = { 'Ok' : Metadata } |
   { 'Err' : ApiError };
 export interface UpdateMessage {
   'canister_principal' : Principal,
@@ -114,20 +112,20 @@ export interface _SERVICE {
     [Principal, bigint, bigint],
     [Uint8Array | number[], [bigint, bigint]]
   >,
-  'get_event_attendees' : ActorMethod<[Principal], Result_4>,
+  'get_event_attendees' : ActorMethod<[Principal], Result_3>,
   'get_event_attendees_count' : ActorMethod<
     [Array<Principal>],
     Array<[Principal, bigint]>
   >,
   'get_event_invites' : ActorMethod<
     [Principal, Principal, Principal],
-    Result_5
+    Result_4
   >,
   'get_event_invites_count' : ActorMethod<
     [Array<Principal>],
     Array<[Principal, bigint]>
   >,
-  'get_metadata' : ActorMethod<[], Result_6>,
+  'get_metadata' : ActorMethod<[], Result_5>,
   'get_self' : ActorMethod<[], Result>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'invite_to_event' : ActorMethod<
@@ -136,6 +134,7 @@ export interface _SERVICE {
   >,
   'join_event' : ActorMethod<[Principal, Principal], Result>,
   'leave_event' : ActorMethod<[Principal], Result_1>,
+  'migrate_to_stable' : ActorMethod<[], undefined>,
   'migration_add_event_attendees' : ActorMethod<
     [Array<[Principal, Attendee]>],
     undefined
