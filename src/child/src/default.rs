@@ -10,8 +10,9 @@ use ic_scalable_misc::{
     enums::api_error_type::ApiError,
     models::http_models::{HttpRequest, HttpResponse},
 };
+use ic_stable_structures::memory_manager::MemoryId;
 
-use crate::store::{DATA, ENTRIES, STABLE_DATA};
+use crate::store::{DATA, ENTRIES, MEMORY_MANAGER, STABLE_DATA};
 
 #[update]
 pub fn migrate_to_stable() {
@@ -50,14 +51,18 @@ pub fn get_metadata() -> Result<Metadata, ApiError> {
     STABLE_DATA.with(|data| ENTRIES.with(|entries| Data::get_metadata(data, entries)))
 }
 
+// Stores the data in stable storage before upgrading the canister.
 #[pre_upgrade]
 pub fn pre_upgrade() {
-    DATA.with(|data| ic_methods::deprecated_pre_upgrade(data))
+    let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)));
+    DATA.with(|data| ic_methods::deprecated_pre_upgrade(data, memory))
 }
 
+// Restores the data from stable- to heap storage after upgrading the canister.
 #[post_upgrade]
 pub fn post_upgrade() {
-    DATA.with(|data| ic_methods::deprecated_post_upgrade(data))
+    let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)));
+    DATA.with(|data| ic_methods::deprecated_post_upgrade(data, memory))
 }
 
 #[update]
