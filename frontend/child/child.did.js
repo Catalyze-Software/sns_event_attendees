@@ -118,6 +118,14 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         [],
       ),
+    'backup_data' : IDL.Func([], [IDL.Text], []),
+    'clear_backup' : IDL.Func([], [], []),
+    'download_chunk' : IDL.Func(
+        [IDL.Nat64],
+        [IDL.Tuple(IDL.Nat64, IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
+    'finalize_upload' : IDL.Func([], [IDL.Text], []),
     'get_attending_from_principal' : IDL.Func(
         [IDL.Principal],
         [Result_3],
@@ -175,7 +183,14 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove_invite' : IDL.Func([IDL.Principal], [Result_1], []),
+    'restore_data' : IDL.Func([], [], []),
     'sanity_check' : IDL.Func([], [IDL.Text], ['query']),
+    'total_chunks' : IDL.Func([], [IDL.Nat64], ['query']),
+    'upload_chunk' : IDL.Func(
+        [IDL.Tuple(IDL.Nat64, IDL.Vec(IDL.Nat8))],
+        [],
+        [],
+      ),
   });
 };
 export const init = ({ IDL }) => {
