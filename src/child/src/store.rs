@@ -242,6 +242,16 @@ impl Store {
         }
     }
 
+    // Method to get the attending entries from a principal
+    pub fn get_attending_from_principal(principal: Principal) -> Result<Vec<Join>, ApiError> {
+        match Self::_get_attendee_from_caller(principal) {
+            // if the attendee is not found, return an error
+            None => Err(Self::_attendee_not_found_error("get_self", None)),
+            // if the attendee is found, return the attendee
+            Some(_attendee) => Ok(_attendee.1.joined.into_iter().map(|f| f.1).collect()),
+        }
+    }
+
     // Method to get the event attendees from a single event
     pub fn get_event_attendees(event_identifier: Principal) -> Vec<JoinedAttendeeResponse> {
         DATA.with(|data| {
@@ -725,7 +735,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Write,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -741,7 +751,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Read,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -757,7 +767,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Edit,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -773,7 +783,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Delete,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
