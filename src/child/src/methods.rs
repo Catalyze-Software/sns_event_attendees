@@ -108,7 +108,9 @@ fn get_self() -> Result<(Principal, Attendee), ApiError> {
 // Method to get the principal joined events
 #[query]
 #[candid_method(query)]
-fn get_attending_from_principal(principal: Principal) -> Result<Vec<Join>, ApiError> {
+fn get_attending_from_principal(
+    principal: Principal,
+) -> Result<Vec<JoinedAttendeeResponse>, ApiError> {
     Store::get_attending_from_principal(principal)
 }
 

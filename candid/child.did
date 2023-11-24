@@ -73,10 +73,9 @@ type Metadata = record {
 type Result = variant { Ok : record { principal; Attendee }; Err : ApiError };
 type Result_1 = variant { Ok; Err : ApiError };
 type Result_2 = variant { Ok; Err : bool };
-type Result_3 = variant { Ok : vec Join; Err : ApiError };
-type Result_4 = variant { Ok : vec JoinedAttendeeResponse; Err : ApiError };
-type Result_5 = variant { Ok : vec InviteAttendeeResponse; Err : ApiError };
-type Result_6 = variant { Ok : Metadata; Err : ApiError };
+type Result_3 = variant { Ok : vec JoinedAttendeeResponse; Err : ApiError };
+type Result_4 = variant { Ok : vec InviteAttendeeResponse; Err : ApiError };
+type Result_5 = variant { Ok : Metadata; Err : ApiError };
 type UpdateMessage = record { canister_principal : principal; message : text };
 type ValidationResponse = record { field : text; message : text };
 service : (principal, text, nat64) -> {
@@ -104,15 +103,15 @@ service : (principal, text, nat64) -> {
       vec nat8,
       record { nat64; nat64 },
     ) query;
-  get_event_attendees : (principal) -> (Result_4) query;
+  get_event_attendees : (principal) -> (Result_3) query;
   get_event_attendees_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_event_invites : (principal, principal, principal) -> (Result_5);
+  get_event_invites : (principal, principal, principal) -> (Result_4);
   get_event_invites_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_metadata : () -> (Result_6) query;
+  get_metadata : () -> (Result_5) query;
   get_self : () -> (Result) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
   invite_to_event : (principal, principal, principal, principal) -> (Result);
