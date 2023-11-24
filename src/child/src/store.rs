@@ -243,12 +243,24 @@ impl Store {
     }
 
     // Method to get the attending entries from a principal
-    pub fn get_attending_from_principal(principal: Principal) -> Result<Vec<Join>, ApiError> {
+    pub fn get_attending_from_principal(
+        principal: Principal,
+    ) -> Result<Vec<JoinedAttendeeResponse>, ApiError> {
         match Self::_get_attendee_from_caller(principal) {
             // if the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error("get_self", None)),
             // if the attendee is found, return the attendee
-            Some(_attendee) => Ok(_attendee.1.joined.into_iter().map(|f| f.1).collect()),
+            Some((_identifier, _attendee)) => Ok(_attendee
+                .joined
+                .iter()
+                .map(|(_event_identifier, _)| {
+                    Self::map_attendee_to_joined_attendee_response(
+                        &_identifier,
+                        &_attendee,
+                        _event_identifier.clone(),
+                    )
+                })
+                .collect()),
         }
     }
 
