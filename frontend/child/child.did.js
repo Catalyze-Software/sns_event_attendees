@@ -117,6 +117,12 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         [],
       ),
+    'backup_data' : IDL.Func([], [IDL.Text], []),
+    'download_chunk' : IDL.Func(
+        [IDL.Nat64],
+        [IDL.Tuple(IDL.Nat64, IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
     'get_chunked_invite_data' : IDL.Func(
         [IDL.Principal, IDL.Nat64, IDL.Nat64],
         [IDL.Vec(IDL.Nat8), IDL.Tuple(IDL.Nat64, IDL.Nat64)],
@@ -170,6 +176,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'remove_invite' : IDL.Func([IDL.Principal], [Result_1], []),
     'sanity_check' : IDL.Func([], [IDL.Text], ['query']),
+    'total_chunks' : IDL.Func([], [IDL.Nat64], ['query']),
   });
 };
 export const init = ({ IDL }) => {

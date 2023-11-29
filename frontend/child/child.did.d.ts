@@ -103,6 +103,8 @@ export interface _SERVICE {
     [Principal, Principal, Principal],
     Result_2
   >,
+  'backup_data' : ActorMethod<[], string>,
+  'download_chunk' : ActorMethod<[bigint], [bigint, Uint8Array | number[]]>,
   'get_chunked_invite_data' : ActorMethod<
     [Principal, bigint, bigint],
     [Uint8Array | number[], [bigint, bigint]]
@@ -147,4 +149,5 @@ export interface _SERVICE {
   >,
   'remove_invite' : ActorMethod<[Principal], Result_1>,
   'sanity_check' : ActorMethod<[], string>,
+  'total_chunks' : ActorMethod<[], bigint>,
 }

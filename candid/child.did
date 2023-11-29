@@ -90,6 +90,8 @@ service : (principal, text, nat64) -> {
     ) -> (Result);
   add_entry_by_parent : (vec nat8) -> (Result_1);
   add_owner_as_attendee : (principal, principal, principal) -> (Result_2);
+  backup_data : () -> (text);
+  download_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
   get_chunked_invite_data : (principal, nat64, nat64) -> (
       vec nat8,
       record { nat64; nat64 },
@@ -124,4 +126,5 @@ service : (principal, text, nat64) -> {
     ) -> (Result_1);
   remove_invite : (principal) -> (Result_1);
   sanity_check : () -> (text) query;
+  total_chunks : () -> (nat64) query;
 }
