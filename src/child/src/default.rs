@@ -18,11 +18,6 @@ pub fn sanity_check() -> String {
     STABLE_DATA.with(|data| Data::get_name(data.borrow().get()))
 }
 
-#[query]
-pub fn get_metadata() -> Result<Metadata, ApiError> {
-    STABLE_DATA.with(|data| ENTRIES.with(|entries| Data::get_metadata(data, entries)))
-}
-
 #[update]
 async fn add_entry_by_parent(entry: Vec<u8>) -> Result<(), ApiError> {
     STABLE_DATA.with(|v| {
@@ -62,7 +57,6 @@ pub fn __export_did_tmp_() -> String {
     use ic_cdk::api::management_canister::http_request::HttpResponse;
     use ic_scalable_canister::ic_scalable_misc::enums::api_error_type::ApiError;
     use ic_scalable_canister::ic_scalable_misc::models::http_models::HttpRequest;
-    use ic_scalable_canister::store::Metadata;
     export_service!();
     __export_service()
 }
