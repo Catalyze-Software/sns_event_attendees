@@ -297,20 +297,17 @@ impl Store {
             // if the attendee is not found, return an error
             None => Err(Self::_attendee_not_found_error("get_self", None)),
             // if the attendee is found, return the attendee
-            Some((_identifier, _attendee)) => {
-                let joins: Vec<JoinedAttendeeResponse> = _attendee
-                    .joined
-                    .iter()
-                    .map(|(_event_identifier, _join)| {
-                        Self::map_attendee_to_joined_attendee_response(
-                            &_identifier,
-                            &_attendee,
-                            _event_identifier.clone(),
-                        )
-                    })
-                    .collect();
-                Ok(joins)
-            }
+            Some((_identifier, _attendee)) => Ok(_attendee
+                .joined
+                .iter()
+                .map(|(_event_identifier, _)| {
+                    Self::map_attendee_to_joined_attendee_response(
+                        &_identifier,
+                        &_attendee,
+                        _event_identifier.clone(),
+                    )
+                })
+                .collect()),
         }
     }
 

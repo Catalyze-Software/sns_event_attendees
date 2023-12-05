@@ -100,6 +100,7 @@ pub fn __export_did_tmp_() -> String {
     use candid::Principal;
     use shared::attendee_model::*;
 
+    use ic_canister_backup::models::*;
     use ic_cdk::api::management_canister::http_request::HttpResponse;
     use ic_scalable_canister::store::Metadata;
     use ic_scalable_misc::enums::api_error_type::ApiError;
