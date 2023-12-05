@@ -5,8 +5,7 @@ use ic_cdk::{
     api::{call, time},
     caller, id,
 };
-use ic_scalable_canister::store::Data;
-use ic_scalable_misc::{
+use ic_scalable_canister::ic_scalable_misc::{
     enums::{
         api_error_type::{ApiError, ApiErrorType},
         privacy_type::Privacy,
@@ -21,6 +20,7 @@ use ic_scalable_misc::{
         permissions_models::{PermissionActionType, PermissionType},
     },
 };
+use ic_scalable_canister::store::Data;
 
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
@@ -35,25 +35,27 @@ use crate::IDENTIFIER_KIND;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
+pub static DATA_MEMORY_ID: MemoryId = MemoryId::new(0);
+pub static ENTRIES_MEMORY_ID: MemoryId = MemoryId::new(1);
+
 thread_local! {
+
     pub static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
     // NEW STABLE
     pub static STABLE_DATA: RefCell<StableCell<Data, Memory>> = RefCell::new(
         StableCell::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1))),
+            MEMORY_MANAGER.with(|m| m.borrow().get(DATA_MEMORY_ID)),
             Data::default(),
         ).expect("failed")
     );
 
     pub static ENTRIES: RefCell<StableBTreeMap<String, Attendee, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2))),
+            MEMORY_MANAGER.with(|m| m.borrow().get(ENTRIES_MEMORY_ID)),
         )
     );
-
-pub static DATA: RefCell<ic_scalable_misc::models::original_data::Data<Attendee>> = RefCell::new(ic_scalable_misc::models::original_data::Data::default());
 }
 
 pub struct Store;

@@ -117,7 +117,6 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         [],
       ),
-    'backup_data' : IDL.Func([], [IDL.Text], []),
     'clear_backup' : IDL.Func([], [], []),
     'download_chunk' : IDL.Func(
         [IDL.Nat64],
@@ -166,12 +165,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'join_event' : IDL.Func([IDL.Principal, IDL.Principal], [Result], []),
     'leave_event' : IDL.Func([IDL.Principal], [Result_1], []),
-    'migrate_to_stable' : IDL.Func([], [], []),
-    'migration_add_event_attendees' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Principal, Attendee))],
-        [],
-        [],
-      ),
     'remove_attendee_from_event' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Principal, IDL.Principal],
         [Result_1],

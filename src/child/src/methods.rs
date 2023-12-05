@@ -1,27 +1,12 @@
-use std::{collections::HashMap, iter::FromIterator};
-
 use candid::Principal;
 use ic_cdk::{caller, query, update};
-use ic_scalable_misc::enums::api_error_type::ApiError;
+use ic_scalable_canister::ic_scalable_misc::enums::api_error_type::ApiError;
 
 use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
 
-use crate::store::DATA;
+use crate::store::STABLE_DATA;
 
 use super::store::Store;
-
-#[update]
-pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> () {
-    if caller()
-        == Principal::from_text("ledm3-52ncq-rffuv-6ed44-hg5uo-iicyu-pwkzj-syfva-heo4k-p7itq-aqe")
-            .unwrap()
-    {
-        DATA.with(|data| {
-            data.borrow_mut().current_entry_id = attendees.clone().len() as u64;
-            data.borrow_mut().entries = HashMap::from_iter(attendees);
-        })
-    }
-}
 
 // Method to join an existing event
 // The method is async because it optionally creates a new canister is created
@@ -176,7 +161,7 @@ fn get_chunked_join_data(
     chunk: usize,
     max_bytes_per_chunk: usize,
 ) -> (Vec<u8>, (usize, usize)) {
-    if caller() != DATA.with(|data| data.borrow().parent) {
+    if caller() != STABLE_DATA.with(|data| data.borrow().get().parent) {
         return (vec![], (0, 0));
     }
 
@@ -193,7 +178,7 @@ fn get_chunked_invite_data(
     chunk: usize,
     max_bytes_per_chunk: usize,
 ) -> (Vec<u8>, (usize, usize)) {
-    if caller() != DATA.with(|data| data.borrow().parent) {
+    if caller() != STABLE_DATA.with(|data| data.borrow().get().parent) {
         return (vec![], (0, 0));
     }
 

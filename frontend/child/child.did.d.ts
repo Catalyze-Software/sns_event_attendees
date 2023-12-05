@@ -103,7 +103,6 @@ export interface _SERVICE {
     [Principal, Principal, Principal],
     Result_2
   >,
-  'backup_data' : ActorMethod<[], string>,
   'clear_backup' : ActorMethod<[], undefined>,
   'download_chunk' : ActorMethod<[bigint], [bigint, Uint8Array | number[]]>,
   'finalize_upload' : ActorMethod<[], string>,
@@ -138,11 +137,6 @@ export interface _SERVICE {
   >,
   'join_event' : ActorMethod<[Principal, Principal], Result>,
   'leave_event' : ActorMethod<[Principal], Result_1>,
-  'migrate_to_stable' : ActorMethod<[], undefined>,
-  'migration_add_event_attendees' : ActorMethod<
-    [Array<[Principal, Attendee]>],
-    undefined
-  >,
   'remove_attendee_from_event' : ActorMethod<
     [Principal, Principal, Principal, Principal],
     Result_1

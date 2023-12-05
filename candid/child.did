@@ -90,7 +90,6 @@ service : (principal, text, nat64) -> {
     ) -> (Result);
   add_entry_by_parent : (vec nat8) -> (Result_1);
   add_owner_as_attendee : (principal, principal, principal) -> (Result_2);
-  backup_data : () -> (text);
   clear_backup : () -> ();
   download_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
   finalize_upload : () -> (text);
@@ -117,8 +116,6 @@ service : (principal, text, nat64) -> {
   invite_to_event : (principal, principal, principal, principal) -> (Result);
   join_event : (principal, principal) -> (Result);
   leave_event : (principal) -> (Result_1);
-  migrate_to_stable : () -> ();
-  migration_add_event_attendees : (vec record { principal; Attendee }) -> ();
   remove_attendee_from_event : (principal, principal, principal, principal) -> (
       Result_1,
     );
