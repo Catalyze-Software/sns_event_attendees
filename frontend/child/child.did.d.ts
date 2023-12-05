@@ -60,19 +60,6 @@ export interface JoinedAttendeeResponse {
   'attendee_identifier' : Principal,
   'event_identifier' : Principal,
 }
-export interface Metadata {
-  'updated_at' : bigint,
-  'name' : string,
-  'max_entries' : bigint,
-  'current_entry_id' : [] | [bigint],
-  'created_at' : bigint,
-  'used_data' : bigint,
-  'cycles' : bigint,
-  'identifier' : bigint,
-  '_available' : boolean,
-  'entries_count' : bigint,
-  'parent' : Principal,
-}
 export type Result = { 'Ok' : [Principal, Attendee] } |
   { 'Err' : ApiError };
 export type Result_1 = { 'Ok' : null } |
@@ -82,8 +69,6 @@ export type Result_2 = { 'Ok' : null } |
 export type Result_3 = { 'Ok' : Array<JoinedAttendeeResponse> } |
   { 'Err' : ApiError };
 export type Result_4 = { 'Ok' : Array<InviteAttendeeResponse> } |
-  { 'Err' : ApiError };
-export type Result_5 = { 'Ok' : Metadata } |
   { 'Err' : ApiError };
 export interface UpdateMessage {
   'canister_principal' : Principal,
@@ -128,7 +113,6 @@ export interface _SERVICE {
     [Array<Principal>],
     Array<[Principal, bigint]>
   >,
-  'get_metadata' : ActorMethod<[], Result_5>,
   'get_self' : ActorMethod<[], Result>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'invite_to_event' : ActorMethod<

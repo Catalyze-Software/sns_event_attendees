@@ -72,20 +72,6 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Vec(InviteAttendeeResponse),
     'Err' : ApiError,
   });
-  const Metadata = IDL.Record({
-    'updated_at' : IDL.Nat64,
-    'name' : IDL.Text,
-    'max_entries' : IDL.Nat64,
-    'current_entry_id' : IDL.Opt(IDL.Nat64),
-    'created_at' : IDL.Nat64,
-    'used_data' : IDL.Nat64,
-    'cycles' : IDL.Nat64,
-    'identifier' : IDL.Nat64,
-    '_available' : IDL.Bool,
-    'entries_count' : IDL.Nat64,
-    'parent' : IDL.Principal,
-  });
-  const Result_5 = IDL.Variant({ 'Ok' : Metadata, 'Err' : ApiError });
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
     'method' : IDL.Text,
@@ -155,7 +141,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64))],
         ['query'],
       ),
-    'get_metadata' : IDL.Func([], [Result_5], ['query']),
     'get_self' : IDL.Func([], [Result], ['query']),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'invite_to_event' : IDL.Func(
