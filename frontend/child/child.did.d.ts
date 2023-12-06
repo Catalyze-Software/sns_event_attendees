@@ -132,7 +132,6 @@ export interface _SERVICE {
   'remove_invite' : ActorMethod<[Principal], Result_1>,
   'restore_data' : ActorMethod<[], undefined>,
   'sanity_check' : ActorMethod<[], string>,
-  'test' : ActorMethod<[], string>,
   'total_chunks' : ActorMethod<[], bigint>,
   'upload_chunk' : ActorMethod<[[bigint, Uint8Array | number[]]], undefined>,
 }
