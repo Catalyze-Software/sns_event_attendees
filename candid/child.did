@@ -113,7 +113,6 @@ service : (principal, text, nat64) -> {
   remove_invite : (principal) -> (Result_1);
   restore_data : () -> ();
   sanity_check : () -> (text) query;
-  test : () -> (text) query;
   total_chunks : () -> (nat64) query;
   upload_chunk : (record { nat64; vec nat8 }) -> ();
 }
