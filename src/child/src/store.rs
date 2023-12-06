@@ -138,8 +138,7 @@ impl Store {
                                     )
                                 })
                             });
-
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             result
                         }
                         Some((_identifier, _)) => {
@@ -153,13 +152,11 @@ impl Store {
                                     )
                                 })
                             });
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             result
                         }
                     },
                 }
-                // TODO: add scaling logic
-                // Determine if an entry needs to be updated or added as a new one
             }
         }
     }
@@ -184,7 +181,8 @@ impl Store {
                 });
 
                 // update the attendee count on the event canister (fire-and-forget)
-                return Ok(Self::update_attendee_count_on_event(&event_identifier));
+                ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
+                return Ok(());
             }
         }
     }
@@ -536,7 +534,7 @@ impl Store {
                         });
 
                         // Update the attendee count on the event canister (fire-and-forget)
-                        Self::update_attendee_count_on_event(&event_identifier);
+                        ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                         result
                     }
                 }
@@ -599,7 +597,7 @@ impl Store {
                                 Data::update_entry(data, entries, _identifier, _attendee)
                             });
                             // Update the attendee count on the event canister (fire-and-forget)
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             response
                         }
                     }
@@ -769,7 +767,7 @@ impl Store {
                         Data::add_entry(data, entries, attendee, Some(IDENTIFIER_KIND.to_string()))
                     })
                 });
-                Self::update_attendee_count_on_event(&event_identifier);
+                ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                 Ok(())
             }
             // If the attendee exists, continue
@@ -790,7 +788,7 @@ impl Store {
                             Data::update_entry(data, entries, _identifier, _attendee)
                         })
                     });
-                    Self::update_attendee_count_on_event(&event_identifier);
+                    ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                     return Ok(());
                 }
             }
@@ -799,7 +797,7 @@ impl Store {
 
     // Method to update the attendee count on the event
     #[allow(unused_must_use)]
-    fn update_attendee_count_on_event(event_identifier: &Principal) -> () {
+    async fn update_attendee_count_on_event(event_identifier: Principal) -> () {
         // Get the attendee count for the event
         let event_attendees_count_array =
             Self::get_event_attendees_count(vec![event_identifier.clone()]);
@@ -813,12 +811,13 @@ impl Store {
         };
 
         // Decode the event identifier and call the update attendee count method on the event
-        let (_, event_canister, _) = Identifier::decode(event_identifier);
+        let (_, event_canister, _) = Identifier::decode(&event_identifier);
         call::call::<(Principal, Principal, usize), ()>(
             event_canister,
             "update_attendee_count_on_event",
             (event_identifier.clone(), id(), count),
-        );
+        )
+        .await;
     }
 
     // This method is used for role / permission based access control

@@ -163,6 +163,7 @@ export const idlFactory = ({ IDL }) => {
     'remove_invite' : IDL.Func([IDL.Principal], [Result_1], []),
     'restore_data' : IDL.Func([], [], []),
     'sanity_check' : IDL.Func([], [IDL.Text], ['query']),
+    'test' : IDL.Func([], [IDL.Text], ['query']),
     'total_chunks' : IDL.Func([], [IDL.Nat64], ['query']),
     'upload_chunk' : IDL.Func(
         [IDL.Tuple(IDL.Nat64, IDL.Vec(IDL.Nat8))],
