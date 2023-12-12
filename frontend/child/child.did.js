@@ -51,13 +51,45 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ApiError });
   const Result_2 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Bool });
+  const CanisterStatusType = IDL.Variant({
+    'stopped' : IDL.Null,
+    'stopping' : IDL.Null,
+    'running' : IDL.Null,
+  });
+  const DefiniteCanisterSettings = IDL.Record({
+    'freezing_threshold' : IDL.Nat,
+    'controllers' : IDL.Vec(IDL.Principal),
+    'memory_allocation' : IDL.Nat,
+    'compute_allocation' : IDL.Nat,
+  });
+  const CanisterStatusResponse = IDL.Record({
+    'status' : CanisterStatusType,
+    'memory_size' : IDL.Nat,
+    'cycles' : IDL.Nat,
+    'settings' : DefiniteCanisterSettings,
+    'idle_cycles_burned_per_day' : IDL.Nat,
+    'module_hash' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
+  const RejectionCode = IDL.Variant({
+    'NoError' : IDL.Null,
+    'CanisterError' : IDL.Null,
+    'SysTransient' : IDL.Null,
+    'DestinationInvalid' : IDL.Null,
+    'Unknown' : IDL.Null,
+    'SysFatal' : IDL.Null,
+    'CanisterReject' : IDL.Null,
+  });
+  const Result_3 = IDL.Variant({
+    'Ok' : IDL.Tuple(CanisterStatusResponse),
+    'Err' : IDL.Tuple(RejectionCode, IDL.Text),
+  });
   const JoinedAttendeeResponse = IDL.Record({
     'principal' : IDL.Principal,
     'group_identifier' : IDL.Principal,
     'attendee_identifier' : IDL.Principal,
     'event_identifier' : IDL.Principal,
   });
-  const Result_3 = IDL.Variant({
+  const Result_4 = IDL.Variant({
     'Ok' : IDL.Vec(JoinedAttendeeResponse),
     'Err' : ApiError,
   });
@@ -68,7 +100,7 @@ export const idlFactory = ({ IDL }) => {
     'invite_type' : InviteType,
     'event_identifier' : IDL.Principal,
   });
-  const Result_4 = IDL.Variant({
+  const Result_5 = IDL.Variant({
     'Ok' : IDL.Vec(InviteAttendeeResponse),
     'Err' : ApiError,
   });
@@ -103,6 +135,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         [],
       ),
+    'canister_status' : IDL.Func([], [Result_3], []),
     'clear_backup' : IDL.Func([], [], []),
     'download_chunk' : IDL.Func(
         [IDL.Nat64],
@@ -112,7 +145,7 @@ export const idlFactory = ({ IDL }) => {
     'finalize_upload' : IDL.Func([], [IDL.Text], []),
     'get_attending_from_principal' : IDL.Func(
         [IDL.Principal],
-        [Result_3],
+        [Result_4],
         ['query'],
       ),
     'get_chunked_invite_data' : IDL.Func(
@@ -125,7 +158,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Nat8), IDL.Tuple(IDL.Nat64, IDL.Nat64)],
         ['query'],
       ),
-    'get_event_attendees' : IDL.Func([IDL.Principal], [Result_3], ['query']),
+    'get_event_attendees' : IDL.Func([IDL.Principal], [Result_4], ['query']),
     'get_event_attendees_count' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64))],
@@ -133,7 +166,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_event_invites' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Principal],
-        [Result_4],
+        [Result_5],
         [],
       ),
     'get_event_invites_count' : IDL.Func(
