@@ -1,34 +1,16 @@
-use std::{collections::HashMap, iter::FromIterator};
+use candid::Principal;
+use ic_cdk::{caller, query, update};
+use ic_scalable_canister::ic_scalable_misc::enums::api_error_type::ApiError;
 
-use candid::{candid_method, Principal};
-use ic_cdk::caller;
-use ic_cdk_macros::{query, update};
-use ic_scalable_misc::enums::api_error_type::ApiError;
+use shared::attendee_model::{Attendee, InviteAttendeeResponse, JoinedAttendeeResponse};
 
-use shared::attendee_model::{Attendee, InviteAttendeeResponse, Join, JoinedAttendeeResponse};
-
-use crate::store::DATA;
+use crate::store::STABLE_DATA;
 
 use super::store::Store;
-
-#[update]
-#[candid_method(update)]
-pub fn migration_add_event_attendees(attendees: Vec<(Principal, Attendee)>) -> () {
-    if caller()
-        == Principal::from_text("ledm3-52ncq-rffuv-6ed44-hg5uo-iicyu-pwkzj-syfva-heo4k-p7itq-aqe")
-            .unwrap()
-    {
-        DATA.with(|data| {
-            data.borrow_mut().current_entry_id = attendees.clone().len() as u64;
-            data.borrow_mut().entries = HashMap::from_iter(attendees);
-        })
-    }
-}
 
 // Method to join an existing event
 // The method is async because it optionally creates a new canister is created
 #[update]
-#[candid_method(update)]
 async fn join_event(
     event_identifier: Principal,
     group_identifier: Principal,
@@ -38,7 +20,6 @@ async fn join_event(
 
 // Method to invite a member to an event
 #[update]
-#[candid_method(update)]
 async fn invite_to_event(
     event_identifier: Principal,
     attendee_principal: Principal,
@@ -53,7 +34,6 @@ async fn invite_to_event(
 
 // Method to accept an invite to an event as a admin
 #[update]
-#[candid_method(update)]
 async fn accept_user_request_event_invite(
     attendee_principal: Principal,
     event_identifier: Principal,
@@ -68,7 +48,6 @@ async fn accept_user_request_event_invite(
 
 // Method to accept an invite to an event as a user
 #[update]
-#[candid_method(update)]
 async fn accept_owner_request_event_invite(
     event_identifier: Principal,
 ) -> Result<(Principal, Attendee), ApiError> {
@@ -77,21 +56,18 @@ async fn accept_owner_request_event_invite(
 
 // Method to get the number of attendees for an event
 #[query]
-#[candid_method(query)]
 fn get_event_attendees_count(event_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
     Store::get_event_attendees_count(event_identifiers)
 }
 
 // Method to get the number of invites for an event
 #[query]
-#[candid_method(query)]
 fn get_event_invites_count(event_identifiers: Vec<Principal>) -> Vec<(Principal, usize)> {
     Store::get_group_invites_count(event_identifiers)
 }
 
 // Method to get the attendees for an event
 #[query]
-#[candid_method(query)]
 fn get_event_attendees(
     event_identifier: Principal,
 ) -> Result<Vec<JoinedAttendeeResponse>, ApiError> {
@@ -100,14 +76,12 @@ fn get_event_attendees(
 
 // Method to get the caller his joined events and invites
 #[query]
-#[candid_method(query)]
 fn get_self() -> Result<(Principal, Attendee), ApiError> {
     Store::get_self(caller())
 }
 
 // Method to get the principal joined events
 #[query]
-#[candid_method(query)]
 fn get_attending_from_principal(
     principal: Principal,
 ) -> Result<Vec<JoinedAttendeeResponse>, ApiError> {
@@ -116,21 +90,18 @@ fn get_attending_from_principal(
 
 // Method to leave an event as a user
 #[update]
-#[candid_method(update)]
 fn leave_event(event_identifier: Principal) -> Result<(), ApiError> {
     Store::remove_join_from_attendee(caller(), event_identifier)
 }
 
 // Method to remove an event invite as a user
 #[update]
-#[candid_method(update)]
 fn remove_invite(event_identifier: Principal) -> Result<(), ApiError> {
     Store::remove_invite_from_event(caller(), event_identifier)
 }
 
 // Method to remove an event attendee as a admin
 #[update]
-#[candid_method(update)]
 async fn remove_attendee_from_event(
     attendee_principal: Principal,
     event_identifier: Principal,
@@ -145,7 +116,6 @@ async fn remove_attendee_from_event(
 
 // Method to remove an event invite as a admin
 #[update]
-#[candid_method(update)]
 async fn remove_attendee_invite_from_event(
     principal: Principal,
     event_identifier: Principal,
@@ -160,7 +130,6 @@ async fn remove_attendee_invite_from_event(
 
 // Method to get event invites for a specific event inside a group
 #[update]
-#[candid_method(update)]
 async fn get_event_invites(
     event_identifier: Principal,
     group_identifier: Principal,
@@ -174,7 +143,6 @@ async fn get_event_invites(
 
 // Method to add the owner as an attendee
 #[update]
-#[candid_method(update)]
 fn add_owner_as_attendee(
     user_principal: Principal,
     event_identifier: Principal,
@@ -188,13 +156,12 @@ fn add_owner_as_attendee(
 // Data serialized and send as byte array chunks ` (bytes, (start_chunk, end_chunk)) `
 // The parent canister can then deserialize the data and pass it to the frontend
 #[query]
-#[candid_method(query)]
 fn get_chunked_join_data(
     event_identifier: Principal,
     chunk: usize,
     max_bytes_per_chunk: usize,
 ) -> (Vec<u8>, (usize, usize)) {
-    if caller() != DATA.with(|data| data.borrow().parent) {
+    if caller() != STABLE_DATA.with(|data| data.borrow().get().parent) {
         return (vec![], (0, 0));
     }
 
@@ -206,13 +173,12 @@ fn get_chunked_join_data(
 // Data serialized and send as byte array chunks ` (bytes, (start_chunk, end_chunk)) `
 // The parent canister can then deserialize the data and pass it to the frontend
 #[query]
-#[candid_method(query)]
 fn get_chunked_invite_data(
     event_identifier: Principal,
     chunk: usize,
     max_bytes_per_chunk: usize,
 ) -> (Vec<u8>, (usize, usize)) {
-    if caller() != DATA.with(|data| data.borrow().parent) {
+    if caller() != STABLE_DATA.with(|data| data.borrow().get().parent) {
         return (vec![], (0, 0));
     }
 

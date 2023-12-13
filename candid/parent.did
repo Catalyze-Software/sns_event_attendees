@@ -80,8 +80,8 @@ service : () -> {
   close_child_canister_and_spawn_sibling : (nat64, vec nat8) -> (Result);
   get_available_canister : () -> (Result_1) query;
   get_canisters : () -> (vec ScalableCanisterDetails) query;
-  get_invites : (principal, nat64, nat64) -> (PagedResponse) query;
+  get_invites : (principal, nat64, nat64) -> (PagedResponse) composite_query;
   get_latest_wasm_version : () -> (WasmVersion) query;
-  get_members : (principal, nat64, nat64) -> (PagedResponse_1) query;
+  get_members : (principal, nat64, nat64) -> (PagedResponse_1) composite_query;
   http_request : (HttpRequest) -> (HttpResponse) query;
 }
