@@ -14,6 +14,21 @@ type Attendee = record {
   invites : vec record { principal; Invite };
   joined : vec record { principal; Join };
 };
+type CanisterStatusResponse = record {
+  status : CanisterStatusType;
+  memory_size : nat;
+  cycles : nat;
+  settings : DefiniteCanisterSettings;
+  idle_cycles_burned_per_day : nat;
+  module_hash : opt vec nat8;
+};
+type CanisterStatusType = variant { stopped; stopping; running };
+type DefiniteCanisterSettings = record {
+  freezing_threshold : nat;
+  controllers : vec principal;
+  memory_allocation : nat;
+  compute_allocation : nat;
+};
 type ErrorMessage = record {
   tag : text;
   message : text;
@@ -57,25 +72,24 @@ type JoinedAttendeeResponse = record {
   attendee_identifier : principal;
   event_identifier : principal;
 };
-type Metadata = record {
-  updated_at : nat64;
-  name : text;
-  max_entries : nat64;
-  current_entry_id : opt nat64;
-  created_at : nat64;
-  used_data : nat64;
-  cycles : nat64;
-  is_available : bool;
-  identifier : nat64;
-  entries_count : nat64;
-  parent : principal;
+type RejectionCode = variant {
+  NoError;
+  CanisterError;
+  SysTransient;
+  DestinationInvalid;
+  Unknown;
+  SysFatal;
+  CanisterReject;
 };
 type Result = variant { Ok : record { principal; Attendee }; Err : ApiError };
 type Result_1 = variant { Ok; Err : ApiError };
 type Result_2 = variant { Ok; Err : bool };
-type Result_3 = variant { Ok : vec JoinedAttendeeResponse; Err : ApiError };
-type Result_4 = variant { Ok : vec InviteAttendeeResponse; Err : ApiError };
-type Result_5 = variant { Ok : Metadata; Err : ApiError };
+type Result_3 = variant {
+  Ok : record { CanisterStatusResponse };
+  Err : record { RejectionCode; text };
+};
+type Result_4 = variant { Ok : vec JoinedAttendeeResponse; Err : ApiError };
+type Result_5 = variant { Ok : vec InviteAttendeeResponse; Err : ApiError };
 type UpdateMessage = record { canister_principal : principal; message : text };
 type ValidationResponse = record { field : text; message : text };
 service : (principal, text, nat64) -> {
@@ -90,11 +104,11 @@ service : (principal, text, nat64) -> {
     ) -> (Result);
   add_entry_by_parent : (vec nat8) -> (Result_1);
   add_owner_as_attendee : (principal, principal, principal) -> (Result_2);
-  backup_data : () -> (text);
+  canister_status : () -> (Result_3);
   clear_backup : () -> ();
   download_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
   finalize_upload : () -> (text);
-  get_attending_from_principal : (principal) -> (Result_3) query;
+  get_attending_from_principal : (principal) -> (Result_4) query;
   get_chunked_invite_data : (principal, nat64, nat64) -> (
       vec nat8,
       record { nat64; nat64 },
@@ -103,21 +117,19 @@ service : (principal, text, nat64) -> {
       vec nat8,
       record { nat64; nat64 },
     ) query;
-  get_event_attendees : (principal) -> (Result_3) query;
+  get_event_attendees : (principal) -> (Result_4) query;
   get_event_attendees_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_event_invites : (principal, principal, principal) -> (Result_4);
+  get_event_invites : (principal, principal, principal) -> (Result_5);
   get_event_invites_count : (vec principal) -> (
       vec record { principal; nat64 },
     ) query;
-  get_metadata : () -> (Result_5) query;
   get_self : () -> (Result) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
   invite_to_event : (principal, principal, principal, principal) -> (Result);
   join_event : (principal, principal) -> (Result);
   leave_event : (principal) -> (Result_1);
-  migration_add_event_attendees : (vec record { principal; Attendee }) -> ();
   remove_attendee_from_event : (principal, principal, principal, principal) -> (
       Result_1,
     );

@@ -1,70 +1,64 @@
-use candid::{candid_method, Principal};
-use ic_cdk::caller;
+use candid::Principal;
+use ic_cdk::{
+    api::{
+        call::RejectionCode,
+        management_canister::{
+            main::{canister_status as _canister_status, CanisterStatusResponse},
+            provisional::CanisterIdRecord,
+        },
+    },
+    caller, id, init, query, update,
+};
 
+use ic_scalable_canister::ic_scalable_misc::{
+    enums::api_error_type::ApiError,
+    models::http_models::{HttpRequest, HttpResponse},
+};
 #[allow(unused_imports)]
-use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_scalable_canister::{
     ic_methods,
     store::{Data, Metadata},
 };
-use ic_scalable_misc::{
-    enums::api_error_type::ApiError,
-    models::http_models::{HttpRequest, HttpResponse},
-};
 
-use crate::store::DATA;
+use crate::store::{ENTRIES, STABLE_DATA};
 
 #[query]
-#[candid_method(query)]
 pub fn sanity_check() -> String {
-    DATA.with(|data| Data::get_name(data))
-}
-
-#[query]
-#[candid_method(query)]
-pub fn get_metadata() -> Result<Metadata, ApiError> {
-    DATA.with(|data| Data::get_metadata(data))
-}
-
-#[pre_upgrade]
-pub fn pre_upgrade() {
-    DATA.with(|data| ic_methods::pre_upgrade(data))
-}
-
-#[post_upgrade]
-pub fn post_upgrade() {
-    DATA.with(|data| ic_methods::post_upgrade(data))
+    STABLE_DATA.with(|data| Data::get_name(data.borrow().get()))
 }
 
 #[update]
-#[candid_method(update)]
 async fn add_entry_by_parent(entry: Vec<u8>) -> Result<(), ApiError> {
-    DATA.with(|v| Data::add_entry_by_parent(v, caller(), entry, Some("eae".to_string())))
+    STABLE_DATA.with(|v| {
+        ENTRIES.with(|entries| {
+            Data::add_entry_by_parent(v, entries, caller(), entry, Some("eae".to_string()))
+        })
+    })
 }
 
 #[update]
-#[candid_method(update)]
 fn accept_cycles() -> u64 {
     ic_methods::accept_cycles()
 }
 
 #[query]
-#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
-    DATA.with(|data| Data::http_request_with_metrics(data, req, vec![]))
+    STABLE_DATA.with(|data| {
+        ENTRIES.with(|entries| {
+            Data::http_request_with_metrics(data, entries.borrow().len() as usize, req, vec![])
+        })
+    })
 }
 
 #[init]
-#[candid_method(init)]
 pub fn init(parent: Principal, name: String, identifier: usize) {
-    DATA.with(|data| {
+    STABLE_DATA.with(|data| {
         ic_methods::init(data, parent, name, identifier);
     })
 }
 
 // Hacky way to expose the candid interface to the outside world
 #[query(name = "__get_candid_interface_tmp_hack")]
-#[candid_method(query, rename = "__get_candid_interface_tmp_hack")]
 pub fn __export_did_tmp_() -> String {
     use candid::export_service;
     use candid::Principal;
@@ -72,9 +66,8 @@ pub fn __export_did_tmp_() -> String {
 
     use ic_canister_backup::models::*;
     use ic_cdk::api::management_canister::http_request::HttpResponse;
-    use ic_scalable_canister::store::Metadata;
-    use ic_scalable_misc::enums::api_error_type::ApiError;
-    use ic_scalable_misc::models::http_models::HttpRequest;
+    use ic_scalable_canister::ic_scalable_misc::enums::api_error_type::ApiError;
+    use ic_scalable_canister::ic_scalable_misc::models::http_models::HttpRequest;
     export_service!();
     __export_service()
 }
@@ -82,6 +75,20 @@ pub fn __export_did_tmp_() -> String {
 // Method used to save the candid interface to a file
 #[test]
 pub fn candid() {
-    use ic_scalable_misc::helpers::candid_helper::save_candid;
+    use ic_scalable_canister::ic_scalable_misc::helpers::candid_helper::save_candid;
     save_candid(__export_did_tmp_(), String::from("child"));
+}
+
+#[update(guard = "is_monitor")]
+async fn canister_status() -> Result<(CanisterStatusResponse,), (RejectionCode, String)> {
+    _canister_status(CanisterIdRecord { canister_id: id() }).await
+}
+
+pub fn is_monitor() -> Result<(), String> {
+    const OWNERS: [&str; 1] = ["6or45-oyaaa-aaaap-absua-cai"];
+
+    match OWNERS.iter().any(|p| p == &caller().to_string()) {
+        true => Ok(()),
+        false => Err("Unauthorized".to_string()),
+    }
 }

@@ -15,6 +15,23 @@ export interface Attendee {
   'invites' : Array<[Principal, Invite]>,
   'joined' : Array<[Principal, Join]>,
 }
+export interface CanisterStatusResponse {
+  'status' : CanisterStatusType,
+  'memory_size' : bigint,
+  'cycles' : bigint,
+  'settings' : DefiniteCanisterSettings,
+  'idle_cycles_burned_per_day' : bigint,
+  'module_hash' : [] | [Uint8Array | number[]],
+}
+export type CanisterStatusType = { 'stopped' : null } |
+  { 'stopping' : null } |
+  { 'running' : null };
+export interface DefiniteCanisterSettings {
+  'freezing_threshold' : bigint,
+  'controllers' : Array<Principal>,
+  'memory_allocation' : bigint,
+  'compute_allocation' : bigint,
+}
 export interface ErrorMessage {
   'tag' : string,
   'message' : string,
@@ -60,30 +77,24 @@ export interface JoinedAttendeeResponse {
   'attendee_identifier' : Principal,
   'event_identifier' : Principal,
 }
-export interface Metadata {
-  'updated_at' : bigint,
-  'name' : string,
-  'max_entries' : bigint,
-  'current_entry_id' : [] | [bigint],
-  'created_at' : bigint,
-  'used_data' : bigint,
-  'cycles' : bigint,
-  'is_available' : boolean,
-  'identifier' : bigint,
-  'entries_count' : bigint,
-  'parent' : Principal,
-}
+export type RejectionCode = { 'NoError' : null } |
+  { 'CanisterError' : null } |
+  { 'SysTransient' : null } |
+  { 'DestinationInvalid' : null } |
+  { 'Unknown' : null } |
+  { 'SysFatal' : null } |
+  { 'CanisterReject' : null };
 export type Result = { 'Ok' : [Principal, Attendee] } |
   { 'Err' : ApiError };
 export type Result_1 = { 'Ok' : null } |
   { 'Err' : ApiError };
 export type Result_2 = { 'Ok' : null } |
   { 'Err' : boolean };
-export type Result_3 = { 'Ok' : Array<JoinedAttendeeResponse> } |
+export type Result_3 = { 'Ok' : [CanisterStatusResponse] } |
+  { 'Err' : [RejectionCode, string] };
+export type Result_4 = { 'Ok' : Array<JoinedAttendeeResponse> } |
   { 'Err' : ApiError };
-export type Result_4 = { 'Ok' : Array<InviteAttendeeResponse> } |
-  { 'Err' : ApiError };
-export type Result_5 = { 'Ok' : Metadata } |
+export type Result_5 = { 'Ok' : Array<InviteAttendeeResponse> } |
   { 'Err' : ApiError };
 export interface UpdateMessage {
   'canister_principal' : Principal,
@@ -103,11 +114,11 @@ export interface _SERVICE {
     [Principal, Principal, Principal],
     Result_2
   >,
-  'backup_data' : ActorMethod<[], string>,
+  'canister_status' : ActorMethod<[], Result_3>,
   'clear_backup' : ActorMethod<[], undefined>,
   'download_chunk' : ActorMethod<[bigint], [bigint, Uint8Array | number[]]>,
   'finalize_upload' : ActorMethod<[], string>,
-  'get_attending_from_principal' : ActorMethod<[Principal], Result_3>,
+  'get_attending_from_principal' : ActorMethod<[Principal], Result_4>,
   'get_chunked_invite_data' : ActorMethod<
     [Principal, bigint, bigint],
     [Uint8Array | number[], [bigint, bigint]]
@@ -116,20 +127,19 @@ export interface _SERVICE {
     [Principal, bigint, bigint],
     [Uint8Array | number[], [bigint, bigint]]
   >,
-  'get_event_attendees' : ActorMethod<[Principal], Result_3>,
+  'get_event_attendees' : ActorMethod<[Principal], Result_4>,
   'get_event_attendees_count' : ActorMethod<
     [Array<Principal>],
     Array<[Principal, bigint]>
   >,
   'get_event_invites' : ActorMethod<
     [Principal, Principal, Principal],
-    Result_4
+    Result_5
   >,
   'get_event_invites_count' : ActorMethod<
     [Array<Principal>],
     Array<[Principal, bigint]>
   >,
-  'get_metadata' : ActorMethod<[], Result_5>,
   'get_self' : ActorMethod<[], Result>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'invite_to_event' : ActorMethod<
@@ -138,10 +148,6 @@ export interface _SERVICE {
   >,
   'join_event' : ActorMethod<[Principal, Principal], Result>,
   'leave_event' : ActorMethod<[Principal], Result_1>,
-  'migration_add_event_attendees' : ActorMethod<
-    [Array<[Principal, Attendee]>],
-    undefined
-  >,
   'remove_attendee_from_event' : ActorMethod<
     [Principal, Principal, Principal, Principal],
     Result_1

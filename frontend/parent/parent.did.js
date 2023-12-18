@@ -109,13 +109,13 @@ export const idlFactory = ({ IDL }) => {
     'get_invites' : IDL.Func(
         [IDL.Principal, IDL.Nat64, IDL.Nat64],
         [PagedResponse],
-        ['query'],
+        ['composite_query'],
       ),
     'get_latest_wasm_version' : IDL.Func([], [WasmVersion], ['query']),
     'get_members' : IDL.Func(
         [IDL.Principal, IDL.Nat64, IDL.Nat64],
         [PagedResponse_1],
-        ['query'],
+        ['composite_query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
   });
