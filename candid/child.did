@@ -104,9 +104,12 @@ service : (principal, text, nat64) -> {
     ) -> (Result);
   add_entry_by_parent : (vec nat8) -> (Result_1);
   add_owner_as_attendee : (principal, principal, principal) -> (Result_2);
+  canister_backup_data : () -> (text, text);
   canister_status : () -> (Result_3);
   clear_backup : () -> ();
   download_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
+  download_entries_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
+  download_stable_data_chunk : (nat64) -> (record { nat64; vec nat8 }) query;
   finalize_upload : () -> (text);
   get_attending_from_principal : (principal) -> (Result_4) query;
   get_chunked_invite_data : (principal, nat64, nat64) -> (
@@ -143,5 +146,7 @@ service : (principal, text, nat64) -> {
   restore_data : () -> ();
   sanity_check : () -> (text) query;
   total_chunks : () -> (nat64) query;
+  total_entries_chunks : () -> (nat64) query;
+  total_stable_data_chunks : () -> (nat64) query;
   upload_chunk : (record { nat64; vec nat8 }) -> ();
 }

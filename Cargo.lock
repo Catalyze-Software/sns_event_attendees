@@ -172,6 +172,7 @@ dependencies = [
  "ic_canister_backup",
  "ic_scalable_canister",
  "serde",
+ "serde_cbor",
  "serde_json",
  "shared",
 ]
