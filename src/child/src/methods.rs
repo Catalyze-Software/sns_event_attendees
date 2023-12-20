@@ -10,7 +10,7 @@ use super::store::Store;
 
 // Method to join an existing event
 // The method is async because it optionally creates a new canister is created
-#[update]
+#[update(guard = "auth")]
 async fn join_event(
     event_identifier: Principal,
     group_identifier: Principal,
@@ -19,7 +19,7 @@ async fn join_event(
 }
 
 // Method to invite a member to an event
-#[update]
+#[update(guard = "auth")]
 async fn invite_to_event(
     event_identifier: Principal,
     attendee_principal: Principal,
@@ -33,7 +33,7 @@ async fn invite_to_event(
 }
 
 // Method to accept an invite to an event as a admin
-#[update]
+#[update(guard = "auth")]
 async fn accept_user_request_event_invite(
     attendee_principal: Principal,
     event_identifier: Principal,
@@ -47,7 +47,7 @@ async fn accept_user_request_event_invite(
 }
 
 // Method to accept an invite to an event as a user
-#[update]
+#[update(guard = "auth")]
 async fn accept_owner_request_event_invite(
     event_identifier: Principal,
 ) -> Result<(Principal, Attendee), ApiError> {
@@ -89,19 +89,19 @@ fn get_attending_from_principal(
 }
 
 // Method to leave an event as a user
-#[update]
+#[update(guard = "auth")]
 fn leave_event(event_identifier: Principal) -> Result<(), ApiError> {
     Store::remove_join_from_attendee(caller(), event_identifier)
 }
 
 // Method to remove an event invite as a user
-#[update]
+#[update(guard = "auth")]
 fn remove_invite(event_identifier: Principal) -> Result<(), ApiError> {
     Store::remove_invite_from_event(caller(), event_identifier)
 }
 
 // Method to remove an event attendee as a admin
-#[update]
+#[update(guard = "auth")]
 async fn remove_attendee_from_event(
     attendee_principal: Principal,
     event_identifier: Principal,
@@ -115,7 +115,7 @@ async fn remove_attendee_from_event(
 }
 
 // Method to remove an event invite as a admin
-#[update]
+#[update(guard = "auth")]
 async fn remove_attendee_invite_from_event(
     principal: Principal,
     event_identifier: Principal,
@@ -142,7 +142,7 @@ async fn get_event_invites(
 }
 
 // Method to add the owner as an attendee
-#[update]
+#[update(guard = "auth")]
 fn add_owner_as_attendee(
     user_principal: Principal,
     event_identifier: Principal,
@@ -183,4 +183,11 @@ fn get_chunked_invite_data(
     }
 
     Store::get_chunked_invite_data(&event_identifier, chunk, max_bytes_per_chunk)
+}
+
+pub fn auth() -> Result<(), String> {
+    match caller() == Principal::anonymous() {
+        true => Err("Unauthorized".to_string()),
+        false => Ok(()),
+    }
 }
