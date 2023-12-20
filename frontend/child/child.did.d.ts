@@ -114,9 +114,18 @@ export interface _SERVICE {
     [Principal, Principal, Principal],
     Result_2
   >,
+  'canister_backup_data' : ActorMethod<[], [string, string]>,
   'canister_status' : ActorMethod<[], Result_3>,
   'clear_backup' : ActorMethod<[], undefined>,
   'download_chunk' : ActorMethod<[bigint], [bigint, Uint8Array | number[]]>,
+  'download_entries_chunk' : ActorMethod<
+    [bigint],
+    [bigint, Uint8Array | number[]]
+  >,
+  'download_stable_data_chunk' : ActorMethod<
+    [bigint],
+    [bigint, Uint8Array | number[]]
+  >,
   'finalize_upload' : ActorMethod<[], string>,
   'get_attending_from_principal' : ActorMethod<[Principal], Result_4>,
   'get_chunked_invite_data' : ActorMethod<
@@ -160,5 +169,7 @@ export interface _SERVICE {
   'restore_data' : ActorMethod<[], undefined>,
   'sanity_check' : ActorMethod<[], string>,
   'total_chunks' : ActorMethod<[], bigint>,
+  'total_entries_chunks' : ActorMethod<[], bigint>,
+  'total_stable_data_chunks' : ActorMethod<[], bigint>,
   'upload_chunk' : ActorMethod<[[bigint, Uint8Array | number[]]], undefined>,
 }
