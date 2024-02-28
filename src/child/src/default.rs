@@ -1,3 +1,4 @@
+use crate::methods::auth;
 use candid::Principal;
 use ic_cdk::{
     api::{
@@ -27,7 +28,7 @@ pub fn sanity_check() -> String {
     STABLE_DATA.with(|data| Data::get_name(data.borrow().get()))
 }
 
-#[update]
+#[update(guard = "auth")]
 async fn add_entry_by_parent(entry: Vec<u8>) -> Result<(), ApiError> {
     STABLE_DATA.with(|v| {
         ENTRIES.with(|entries| {
