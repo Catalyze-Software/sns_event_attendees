@@ -5,8 +5,7 @@ use ic_cdk::{
     api::{call, time},
     caller, id,
 };
-use ic_scalable_canister::store::Data;
-use ic_scalable_misc::{
+use ic_scalable_canister::ic_scalable_misc::{
     enums::{
         api_error_type::{ApiError, ApiErrorType},
         privacy_type::Privacy,
@@ -21,6 +20,12 @@ use ic_scalable_misc::{
         permissions_models::{PermissionActionType, PermissionType},
     },
 };
+use ic_scalable_canister::store::Data;
+
+use ic_stable_structures::{
+    memory_manager::{MemoryId, MemoryManager, VirtualMemory},
+    {DefaultMemoryImpl, StableBTreeMap, StableCell},
+};
 
 use shared::attendee_model::{
     Attendee, Invite, InviteAttendeeResponse, InviteType, Join, JoinedAttendeeResponse,
@@ -28,8 +33,29 @@ use shared::attendee_model::{
 
 use crate::IDENTIFIER_KIND;
 
+type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+pub static DATA_MEMORY_ID: MemoryId = MemoryId::new(0);
+pub static ENTRIES_MEMORY_ID: MemoryId = MemoryId::new(1);
+
 thread_local! {
-    pub static DATA: RefCell<Data<Attendee>>  = RefCell::new(Data::default());
+
+    pub static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+        RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+
+    // NEW STABLE
+    pub static STABLE_DATA: RefCell<StableCell<Data, Memory>> = RefCell::new(
+        StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(DATA_MEMORY_ID)),
+            Data::default(),
+        ).expect("failed")
+    );
+
+    pub static ENTRIES: RefCell<StableBTreeMap<String, Attendee, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(ENTRIES_MEMORY_ID)),
+        )
+    );
 }
 
 pub struct Store;
@@ -64,7 +90,9 @@ impl Store {
                                 ApiErrorType::BadRequest,
                                 "ALREADY_JOINED",
                                 "You are already part of this event",
-                                DATA.with(|data| Data::get_name(data)).as_str(),
+                                STABLE_DATA
+                                    .with(|data| Data::get_name(data.borrow().get()))
+                                    .as_str(),
                                 "join_group",
                                 None,
                             ));
@@ -75,7 +103,9 @@ impl Store {
                                 ApiErrorType::BadRequest,
                                 "PENDING_INVITE",
                                 "There is already a pending invite for this event",
-                                DATA.with(|data| Data::get_name(data)).as_str(),
+                                STABLE_DATA
+                                    .with(|data| Data::get_name(data.borrow().get()))
+                                    .as_str(),
                                 "join_event",
                                 None,
                             ));
@@ -98,27 +128,35 @@ impl Store {
                     // If the attendee was updated or added, continue
                     Ok(_updated_attendee) => match Self::_get_attendee_from_caller(caller) {
                         None => {
-                            let result = DATA.with(|data| {
-                                Data::add_entry(
-                                    data,
-                                    _updated_attendee,
-                                    Some(IDENTIFIER_KIND.to_string()),
-                                )
+                            let result = STABLE_DATA.with(|data| {
+                                ENTRIES.with(|entries| {
+                                    Data::add_entry(
+                                        data,
+                                        entries,
+                                        _updated_attendee,
+                                        Some(IDENTIFIER_KIND.to_string()),
+                                    )
+                                })
                             });
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             result
                         }
                         Some((_identifier, _)) => {
-                            let result = DATA.with(|data| {
-                                Data::update_entry(data, _identifier, _updated_attendee)
+                            let result = STABLE_DATA.with(|data| {
+                                ENTRIES.with(|entries| {
+                                    Data::update_entry(
+                                        data,
+                                        entries,
+                                        _identifier,
+                                        _updated_attendee,
+                                    )
+                                })
                             });
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             result
                         }
                     },
                 }
-                // TODO: add scaling logic
-                // Determine if an entry needs to be updated or added as a new one
             }
         }
     }
@@ -137,10 +175,14 @@ impl Store {
             // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
                 _attendee.joined.remove(&event_identifier);
-                let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+                let _ = STABLE_DATA.with(|data| {
+                    ENTRIES
+                        .with(|entries| Data::update_entry(data, entries, _identifier, _attendee))
+                });
 
                 // update the attendee count on the event canister (fire-and-forget)
-                return Ok(Self::update_attendee_count_on_event(&event_identifier));
+                ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
+                return Ok(());
             }
         }
     }
@@ -159,7 +201,10 @@ impl Store {
             // if the attendee is found, continue
             Some((_identifier, mut _attendee)) => {
                 _attendee.invites.remove(&event_identifier);
-                let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+                let _ = STABLE_DATA.with(|data| {
+                    ENTRIES
+                        .with(|entries| Data::update_entry(data, entries, _identifier, _attendee))
+                });
                 Ok(())
             }
         }
@@ -224,7 +269,9 @@ impl Store {
                     ApiErrorType::BadRequest,
                     "UNSUPPORTED",
                     "This type isnt supported through this call",
-                    DATA.with(|data| Data::get_name(data)).as_str(),
+                    STABLE_DATA
+                        .with(|data| Data::get_name(data.borrow().get()))
+                        .as_str(),
                     "add_invite_or_join_event_to_attendee",
                     None,
                 ))
@@ -242,10 +289,32 @@ impl Store {
         }
     }
 
+    // Method to get the attending entries from a principal
+    pub fn get_attending_from_principal(
+        principal: Principal,
+    ) -> Result<Vec<JoinedAttendeeResponse>, ApiError> {
+        match Self::_get_attendee_from_caller(principal) {
+            // if the attendee is not found, return an error
+            None => Err(Self::_attendee_not_found_error("get_self", None)),
+            // if the attendee is found, return the attendee
+            Some((_identifier, _attendee)) => Ok(_attendee
+                .joined
+                .iter()
+                .map(|(_event_identifier, _)| {
+                    Self::map_attendee_to_joined_attendee_response(
+                        &_identifier,
+                        &_attendee,
+                        _event_identifier.clone(),
+                    )
+                })
+                .collect()),
+        }
+    }
+
     // Method to get the event attendees from a single event
     pub fn get_event_attendees(event_identifier: Principal) -> Vec<JoinedAttendeeResponse> {
-        DATA.with(|data| {
-            let attendees = Data::get_entries(data);
+        ENTRIES.with(|entries| {
+            let attendees = Data::get_entries(entries);
 
             attendees
                 .iter()
@@ -257,7 +326,7 @@ impl Store {
                 })
                 .map(|(_identifier, _attendee)| {
                     Self::map_attendee_to_joined_attendee_response(
-                        _identifier,
+                        &Principal::from_text(_identifier).expect("failed"),
                         _attendee,
                         event_identifier.clone(),
                     )
@@ -271,9 +340,9 @@ impl Store {
         // Create the initial attendees count array
         let mut attendees_count: Vec<(Principal, usize)> = vec![];
 
-        DATA.with(|data| {
+        ENTRIES.with(|entries| {
             // Get the attendees from the data canister
-            let attendees = Data::get_entries(data);
+            let attendees = Data::get_entries(entries);
 
             // Loop through the event identifiers
             for event_identifier in event_identifiers {
@@ -300,9 +369,9 @@ impl Store {
         // Create the initial invite count array
         let mut attendees_count: Vec<(Principal, usize)> = vec![];
 
-        DATA.with(|data| {
+        ENTRIES.with(|entries| {
             // Get the attendees from the data canister
-            let attendees = Data::get_entries(data);
+            let attendees = Data::get_entries(entries);
 
             // Loop through the group identifiers
             for group_identifier in group_identifiers {
@@ -327,9 +396,9 @@ impl Store {
 
     // Method to get the event invites from a single event
     pub fn get_event_invites(event_identifier: Principal) -> Vec<InviteAttendeeResponse> {
-        DATA.with(|data| {
+        ENTRIES.with(|entries| {
             // Get the attendees from the data canister
-            Data::get_entries(data)
+            Data::get_entries(entries)
                 .iter()
                 // Filter the attendees to only those that have been invited to the event
                 .filter(|(_identifier, _attendee)| {
@@ -341,7 +410,7 @@ impl Store {
                 // Map the attendee to an invite attendee response
                 .map(|(_identifier, _attendee)| {
                     Self::map_attendee_to_invite_attendee_response(
-                        _identifier,
+                        &Principal::from_text(_identifier).expect("failed"),
                         _attendee,
                         event_identifier.clone(),
                     )
@@ -373,7 +442,11 @@ impl Store {
                     invites: HashMap::from_iter(vec![(event_identifier, invite)]),
                 };
                 // Add the attendee to the data canister
-                DATA.with(|data| Data::add_entry(data, attendee, Some(IDENTIFIER_KIND.to_string())))
+                STABLE_DATA.with(|data| {
+                    ENTRIES.with(|entries| {
+                        Data::add_entry(data, entries, attendee, Some(IDENTIFIER_KIND.to_string()))
+                    })
+                })
             }
             // If the attendee is found
             Some((_identifier, mut _attendee)) => {
@@ -382,7 +455,9 @@ impl Store {
                         ApiErrorType::BadRequest,
                         "ALREADY_JOINED",
                         "You already joined this event",
-                        DATA.with(|data| Data::get_name(data)).as_str(),
+                        STABLE_DATA
+                            .with(|data| Data::get_name(data.borrow().get()))
+                            .as_str(),
                         "invite_to_event",
                         None,
                     ));
@@ -390,7 +465,10 @@ impl Store {
                 // add the invite to the invites array
                 _attendee.invites.insert(event_identifier, invite);
                 // Update the attendee in the data canister
-                DATA.with(|data| Data::update_entry(data, _identifier, _attendee))
+                STABLE_DATA.with(|data| {
+                    ENTRIES
+                        .with(|entries| Data::update_entry(data, entries, _identifier, _attendee))
+                })
             }
         }
     }
@@ -415,7 +493,9 @@ impl Store {
                         ApiErrorType::NotFound,
                         "NO_INVITE_FOUND",
                         "There is no invite found for this event",
-                        DATA.with(|data| Data::get_name(data)).as_str(),
+                        STABLE_DATA
+                            .with(|data| Data::get_name(data.borrow().get()))
+                            .as_str(),
                         "accept_user_request_event_invite",
                         None,
                     )),
@@ -427,7 +507,9 @@ impl Store {
                                 ApiErrorType::BadRequest,
                                 "INVALID_TYPE",
                                 "Invalid invite type",
-                                DATA.with(|data| Data::get_name(data)).as_str(),
+                                STABLE_DATA
+                                    .with(|data| Data::get_name(data.borrow().get()))
+                                    .as_str(),
                                 "accept_user_request_group_invite",
                                 None,
                             ));
@@ -445,11 +527,14 @@ impl Store {
                         );
 
                         // Update the attendee in the data canister
-                        let result =
-                            DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+                        let result = STABLE_DATA.with(|data| {
+                            ENTRIES.with(|entries| {
+                                Data::update_entry(data, entries, _identifier, _attendee)
+                            })
+                        });
 
                         // Update the attendee count on the event canister (fire-and-forget)
-                        Self::update_attendee_count_on_event(&event_identifier);
+                        ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                         result
                     }
                 }
@@ -462,7 +547,7 @@ impl Store {
         caller: Principal,
         event_identifier: Principal,
     ) -> Result<(Principal, Attendee), ApiError> {
-        DATA.with(|data| {
+        STABLE_DATA.with(|data| {
             match Self::_get_attendee_from_caller(caller) {
                 // If the attendee is not found, return an error
                 None => Err(Self::_attendee_not_found_error(
@@ -478,7 +563,7 @@ impl Store {
                             ApiErrorType::NotFound,
                             "NO_INVITE_FOUND",
                             "There is no invite found for this group",
-                            Data::get_name(data).as_str(),
+                            Data::get_name(data.borrow().get()).as_str(),
                             "accept_owner_request_event_invite",
                             None,
                         )),
@@ -490,7 +575,7 @@ impl Store {
                                     ApiErrorType::BadRequest,
                                     "INVALID_TYPE",
                                     "Invalid invite type",
-                                    Data::get_name(data).as_str(),
+                                    Data::get_name(data.borrow().get()).as_str(),
                                     "accept_owner_request_event_invite",
                                     None,
                                 ));
@@ -508,9 +593,11 @@ impl Store {
                             );
 
                             // Update the attendee in the data canister
-                            let response = Data::update_entry(data, _identifier, _attendee);
+                            let response = ENTRIES.with(|entries| {
+                                Data::update_entry(data, entries, _identifier, _attendee)
+                            });
                             // Update the attendee count on the event canister (fire-and-forget)
-                            Self::update_attendee_count_on_event(&event_identifier);
+                            ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                             response
                         }
                     }
@@ -533,13 +620,13 @@ impl Store {
             )
             .await;
 
-        DATA.with(|data| match event_privacy_response {
+        STABLE_DATA.with(|data| match event_privacy_response {
             // If the inter-canister call fails, return an error
             Err(err) => Err(api_error(
                 ApiErrorType::BadRequest,
                 "INTER_CANISTER_CALL_FAILED",
                 err.1.as_str(),
-                Data::get_name(data).as_str(),
+                Data::get_name(data.borrow().get()).as_str(),
                 "get_event_privacy_and_owner",
                 None,
             )),
@@ -590,15 +677,23 @@ impl Store {
 
     // Method to get the attendee from the caller principal
     fn _get_attendee_from_caller(caller: Principal) -> Option<(Principal, Attendee)> {
-        let attendees = DATA.with(|data| Data::get_entries(data));
-        attendees
+        let attendees = ENTRIES.with(|entries| Data::get_entries(entries));
+        let attendee = attendees
             .into_iter()
-            .find(|(_identifier, _attendee)| _attendee.principal == caller)
+            .find(|(_identifier, _attendee)| _attendee.principal == caller);
+
+        match attendee {
+            None => None,
+            Some((_identifier, _attendee)) => Some((
+                Principal::from_text(_identifier).expect("failed"),
+                _attendee,
+            )),
+        }
     }
 
     // Method to get the attendee count for an event
     fn _get_attendee_count_for_event(group_identifier: &Principal) -> usize {
-        let attendees = DATA.with(|data| Data::get_entries(data));
+        let attendees = ENTRIES.with(|entries| Data::get_entries(entries));
         attendees
             .iter()
             .filter(|(_identifier, _attendee)| {
@@ -616,7 +711,9 @@ impl Store {
             ApiErrorType::NotFound,
             "ATTENDEE_NOT_FOUND",
             "Attendee not found",
-            DATA.with(|data| Data::get_name(data)).as_str(),
+            STABLE_DATA
+                .with(|data| Data::get_name(data.borrow().get()))
+                .as_str(),
             method_name,
             inputs,
         )
@@ -665,9 +762,12 @@ impl Store {
                     invites: HashMap::new(),
                 };
                 // Add the attendee to the attendees
-                let _ = DATA.with(|data| {
-                    Data::add_entry(data, attendee, Some(IDENTIFIER_KIND.to_string()))
+                let _ = STABLE_DATA.with(|data| {
+                    ENTRIES.with(|entries| {
+                        Data::add_entry(data, entries, attendee, Some(IDENTIFIER_KIND.to_string()))
+                    })
                 });
+                ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                 Ok(())
             }
             // If the attendee exists, continue
@@ -683,7 +783,12 @@ impl Store {
                 } else {
                     _attendee.joined.insert(event_identifier, join);
                     // Update the attendee
-                    let _ = DATA.with(|data| Data::update_entry(data, _identifier, _attendee));
+                    let _ = STABLE_DATA.with(|data| {
+                        ENTRIES.with(|entries| {
+                            Data::update_entry(data, entries, _identifier, _attendee)
+                        })
+                    });
+                    ic_cdk::spawn(Self::update_attendee_count_on_event(event_identifier));
                     return Ok(());
                 }
             }
@@ -692,7 +797,7 @@ impl Store {
 
     // Method to update the attendee count on the event
     #[allow(unused_must_use)]
-    fn update_attendee_count_on_event(event_identifier: &Principal) -> () {
+    async fn update_attendee_count_on_event(event_identifier: Principal) -> () {
         // Get the attendee count for the event
         let event_attendees_count_array =
             Self::get_event_attendees_count(vec![event_identifier.clone()]);
@@ -706,12 +811,13 @@ impl Store {
         };
 
         // Decode the event identifier and call the update attendee count method on the event
-        let (_, event_canister, _) = Identifier::decode(event_identifier);
+        let (_, event_canister, _) = Identifier::decode(&event_identifier);
         call::call::<(Principal, Principal, usize), ()>(
             event_canister,
             "update_attendee_count_on_event",
             (event_identifier.clone(), id(), count),
-        );
+        )
+        .await;
     }
 
     // This method is used for role / permission based access control
@@ -725,7 +831,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Write,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -741,7 +847,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Read,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -757,7 +863,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Edit,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -773,7 +879,7 @@ impl Store {
             group_identifier,
             member_identifier,
             PermissionActionType::Delete,
-            PermissionType::Event(None),
+            PermissionType::Attendee(None),
         )
         .await
     }
@@ -796,7 +902,9 @@ impl Store {
                         ApiErrorType::Unauthorized,
                         "PRINCIPAL_MISMATCH",
                         "Principal mismatch",
-                        DATA.with(|data| Data::get_name(data)).as_str(),
+                        STABLE_DATA
+                            .with(|data| Data::get_name(data.borrow().get()))
+                            .as_str(),
                         "check_permission",
                         None,
                     ));
@@ -813,7 +921,9 @@ impl Store {
                                 ApiErrorType::Unauthorized,
                                 "NO_PERMISSION",
                                 "No permission",
-                                DATA.with(|data| Data::get_name(data)).as_str(),
+                                STABLE_DATA
+                                    .with(|data| Data::get_name(data.borrow().get()))
+                                    .as_str(),
                                 "check_permission",
                                 None,
                             ));
@@ -825,7 +935,9 @@ impl Store {
                         ApiErrorType::Unauthorized,
                         "NO_PERMISSION",
                         err.as_str(),
-                        DATA.with(|data| Data::get_name(data)).as_str(),
+                        STABLE_DATA
+                            .with(|data| Data::get_name(data.borrow().get()))
+                            .as_str(),
                         "check_permission",
                         None,
                     )),
@@ -835,7 +947,9 @@ impl Store {
                 ApiErrorType::Unauthorized,
                 "NO_PERMISSION",
                 err.as_str(),
-                DATA.with(|data| Data::get_name(data)).as_str(),
+                STABLE_DATA
+                    .with(|data| Data::get_name(data.borrow().get()))
+                    .as_str(),
                 "check_permission",
                 None,
             )),
@@ -850,7 +964,7 @@ impl Store {
         chunk: usize,
         max_bytes_per_chunk: usize,
     ) -> (Vec<u8>, (usize, usize)) {
-        let attendees = DATA.with(|data| Data::get_entries(data));
+        let attendees = ENTRIES.with(|entries| Data::get_entries(entries));
         // Get attendees for filtering
         let mapped_attendees: Vec<JoinedAttendeeResponse> = attendees
             .iter()
@@ -864,7 +978,7 @@ impl Store {
             // Map attendee to joined attendee response
             .map(|(_identifier, _attendee_data)| {
                 Self::map_attendee_to_joined_attendee_response(
-                    _identifier,
+                    &Principal::from_text(_identifier).expect("failed"),
                     _attendee_data,
                     event_identifier.clone(),
                 )
@@ -911,7 +1025,7 @@ impl Store {
         chunk: usize,
         max_bytes_per_chunk: usize,
     ) -> (Vec<u8>, (usize, usize)) {
-        let attendees = DATA.with(|data| Data::get_entries(data));
+        let attendees = ENTRIES.with(|entries| Data::get_entries(entries));
         // Get attendees for filtering
         let mapped_attendees: Vec<InviteAttendeeResponse> = attendees
             .iter()
@@ -925,7 +1039,7 @@ impl Store {
             // Map member to joined member response
             .map(|(_identifier, _event_data)| {
                 Self::map_attendee_to_invite_attendee_response(
-                    _identifier,
+                    &Principal::from_text(_identifier).expect("failed"),
                     _event_data,
                     event_identifier.clone(),
                 )
