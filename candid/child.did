@@ -133,6 +133,7 @@ service : (principal, text, nat64) -> {
   invite_to_event : (principal, principal, principal, principal) -> (Result);
   join_event : (principal, principal) -> (Result);
   leave_event : (principal) -> (Result_1);
+  read_attendees_entries : () -> (vec record { text; Attendee }) query;
   remove_attendee_from_event : (principal, principal, principal, principal) -> (
       Result_1,
     );
